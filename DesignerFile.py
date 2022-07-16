@@ -5,6 +5,16 @@ import GateFile
 import SettingsFile
 import SimulationFile
 import copy
+import pickle
+import SettingsFile
+import math
+import matplotlib.pyplot as plt
+import cupy as cnp
+import numpy as np
+import random
+import pandas as pd
+import matplotlib.cm as cm
+import matplotlib as mpl
 
 class Designer:
     gridHeight = -1
@@ -78,6 +88,7 @@ class Designer:
         print(entry)
     
     def runSimulation(self):
+        self.settings.shots = 256
         simulation = SimulationFile.Simulation(self.settings)
         simulation.sendStateInfo(self.gridWidth, self.gridHeight, self.grid)
         self.result = simulation.get_results()
@@ -85,3 +96,50 @@ class Designer:
 
     def getVisualization(self):
         return self.resultingHistgram
+
+    def saveSimulationToFile(self, filename="quantumCircuitLatest.qc"):
+        fileFormat = {"results": self.result,
+            "gate_set": self.visible_gates, "gridWidth": self.gridWidth, "gridHeight": self.gridHeight,
+            "grid": self.grid, "settings": self.settings}
+        with open(filename, 'wb') as fileSave:
+            pickle.dump(fileFormat, fileSave)
+    
+    def loadSimulationFromFile(self, filename="quantumCircuitLatest.qc"):
+        with open(filename, 'rb') as fileSave:
+            fileFormat = pickle.load(fileSave)
+            self.result = fileFormat["results"]
+            results = self.result
+            fig = plt.figure(figsize = (20, 5))
+            xVal = []
+            yVal = []
+            norm = mpl.colors.Normalize(vmin=0, vmax=np.pi)
+            cmap = cm.hsv
+            m = cm.ScalarMappable(norm=norm, cmap=cmap)
+            for entry in self.result:
+                xVal.append(entry[0][::-1])
+                yVal.append(cnp.asnumpy(entry[1])*100)
+            phases = [m.to_rgba(np.angle(cnp.asnumpy(results[j][2]) * 1j)) for j in range(len(results))]
+
+            df = pd.DataFrame(
+                dict(
+                    x=xVal,
+                    y=yVal,
+                    phase=phases
+                )
+            )
+
+            df_sorted = df.sort_values('x')
+            plt.bar(df_sorted['x'], df_sorted['y'], width = 0.4, color = df_sorted['phase'])
+            plt.xlabel("Computational Result")
+            plt.ylabel("Probability")
+            rotationAmount = math.floor(90/(1 + np.exp(-(((len(xVal))/3)-5))))
+            plt.xticks(rotation = rotationAmount)
+            cbar = plt.colorbar(m)
+            cbar.set_label('Relative Phase of State (Radians)', rotation=-90, labelpad=20)
+            plt.title("Probability Distribution of Given Quantum Circuit")
+            self.resultingHistgram = plt
+            self.visible_gates = fileFormat["gate_set"]
+            self.gridWidth = fileFormat["gridWidth"]
+            self.gridHeight = fileFormat["gridHeight"]
+            self.grid = fileFormat["grid"]
+            self.settings = fileFormat["settings"]

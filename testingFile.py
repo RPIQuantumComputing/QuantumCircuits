@@ -31,5 +31,10 @@ designer.printDesign()
 
 # Now, one can run the simulation
 designer.runSimulation()
-plt = designer.getVisualization()
-plt.show()
+designer.saveSimulationToFile()
+
+# We can test loading from file
+designer2 = DesignerFile.Designer()
+designer2.loadSimulationFromFile()
+plt = designer2.getVisualization()
+#plt.show()
