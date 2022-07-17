@@ -97,6 +97,9 @@ class Designer:
     def getVisualization(self):
         return self.resultingHistgram
 
+    def setBackend(self, name):
+        self.settings.backend = "FeynmanSimulation"
+
     def saveSimulationToFile(self, filename="quantumCircuitLatest.qc"):
         fileFormat = {"results": self.result,
             "gate_set": self.visible_gates, "gridWidth": self.gridWidth, "gridHeight": self.gridHeight,

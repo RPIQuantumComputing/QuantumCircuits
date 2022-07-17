@@ -38,3 +38,8 @@ designer2 = DesignerFile.Designer()
 designer2.loadSimulationFromFile()
 plt = designer2.getVisualization()
 #plt.show()
+
+designer2.setBackend("FeynmanSimulation")
+designer2.runSimulation()
+plt = designer2.getVisualization()
+plt.show()

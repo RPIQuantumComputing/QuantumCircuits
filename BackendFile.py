@@ -14,6 +14,10 @@ from numpy import linalg as LA
 import scipy
 import pandas as pd
 from scipy.optimize import minimize
+from qiskit import QuantumCircuit
+from qiskit import Aer, transpile
+from qiskit.tools.visualization import plot_histogram, plot_state_city
+import qiskit.quantum_info as qi
 
 class HamiltonionBackend:
     provider = "Local"
@@ -305,8 +309,83 @@ class HamiltonionBackend:
         self.histogramResult = plt
         self.results = results
 
+class FeynmanBackend:
+    provider = "Local"
+    settings = None
+    histogramResult = None
+    results = None
+
+    def __init__(self, newSettings):
+        self.settings = newSettings
+    
+    def sendAPIToken():
+        pass
+    
+    def sendRequest(self, gridWidth, gridHeight, grid):
+        circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
+        for widthIdx in range(gridWidth):
+            for heightIdx in range(gridHeight):
+                if(grid[widthIdx][heightIdx].getName() != '-'):
+                    if(grid[widthIdx][heightIdx].getName() == 'CNOT'):
+                        circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
+                        circuitOperators[widthIdx][heightIdx+1] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
+                    else:
+                        circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
+        numQubits = gridHeight
+        numDepth = gridWidth
+        circuit = QuantumCircuit(numQubits)
+        for widthIdx in range(gridWidth):
+            circuitLayer = []
+            for heightIdx in range(gridHeight):
+                if(grid[widthIdx][heightIdx].getName() != '-'):
+                    if(grid[widthIdx][heightIdx].getName() == 'H'):
+                        circuit.h(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'X'):
+                        circuit.x(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'Y'):
+                        circuit.y(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'Z'):
+                        circuit.z(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'S'):
+                        circuit.s(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'T'):
+                        circuit.t(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'CNOT'):
+                        circuit.cnot(heightIdx, heightIdx + 1)
+                        heightIdx += 1
+        circuit.measure_all()
+        simulator = Aer.get_backend('aer_simulator_density_matrix')
+        self.results = simulator.run(circuit).result().get_counts(circuit)
+        fig = plt.figure(figsize = (20, 5))
+        xVal = []
+        yVal = []
+        total = 0
+        for _, y in self.results.items():
+            total += y
+        for a, b in self.results.items():
+            xVal.append(a)
+            yVal.append((b / total) * 100)
+
+        df = pd.DataFrame(
+            dict(
+                x=xVal,
+                y=yVal
+            )
+        )
+
+        df_sorted = df.sort_values('x')
+        plt.bar(df_sorted['x'], df_sorted['y'], width = 0.4)
+        plt.xlabel("Computational Result")
+        plt.ylabel("Probability")
+        rotationAmount = math.floor(90/(1 + np.exp(-(((len(xVal))/3)-5))))
+        plt.xticks(rotation = rotationAmount)
+        plt.title("Probability Distribution of Given Quantum Circuit")
+        self.histogramResult = plt
+        print(self.results)
+
 def BackendFactory(backendType="HamiltionSimulation", settings=SettingsFile.Settings()):
     backendTypes = {
         "HamiltionSimulation" : HamiltonionBackend,
+        "FeynmanSimulation" : FeynmanBackend,
     }
     return backendTypes[backendType](settings)
