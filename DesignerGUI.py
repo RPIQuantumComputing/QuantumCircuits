@@ -76,9 +76,35 @@ def runSimulation(self):
 
 def changeSimulationTechniqueHamiltonian():
 	designer.settings.backend = "HamiltionSimulation"
+	print("Changed to Hamiltion Simulation")
 def changeSimulationTechniqueFeynman():
 	designer.settings.backend = "FeynmanSimulation"
+	print("Changed to Feynman Simulation")
+	
+def changeMeasurement(checked):
+	designer.settings.measurement = checked
+	print("Set measurement to " + str(checked))
+	
+def changeSuggestion(checked):
+	designer.settings.gate_suggestion = checked
+	print("Set gate suggestion to " + str(checked))
+	
+def changeIncresav(checked):
+	designer.settings.incremental_saving = checked
+	print("Set incremental saving to " + str(checked))
+	
+def changeIncresim(checked):
+	designer.settings.incremental_simulation = checked
+	print("Set incremental simulation to " + str(checked))
+	
+def updateNumQubit(val):
+	designer.settings.num_qubits = val
+	print("Set number of qubits to " + str(val))
 
+def updateNumWidth(val):
+	designer.settings.num_width = val
+	print("Set width to " + str(val))
+	
 class Window(QMainWindow):
 	def __init__(self, parent=None):
 		super(Window, self).__init__(parent)
@@ -88,39 +114,43 @@ class Window(QMainWindow):
 
 		background = QComboBox()
 		background.addItems(QStyleFactory.keys())
-
 		
-		toolbar = QToolBar("TOOLBAR")
-		toolbar.setIconSize(QSize(20, 20))
+		menu = self.menuBar()
 		
-		button_file = QAction("&File", self)
-		toolbar.addAction(button_file)
+		file_menu = QMenu("&File", self)
+		menu.addMenu(file_menu)
 		
-		button_class = QAction("&Class", self)
-		toolbar.addAction(button_class)
+		button_class = QMenu("&Class", self)
+		menu.addMenu(button_class)
 		
-		button_learn = QAction("&Learn", self)
-		toolbar.addAction(button_learn)
+		button_learn = QMenu("&Learn", self)
+		menu.addMenu(button_learn)
+		
+		new = QAction("&New", self)
+		save = QAction("&Save", self)
+		load = QAction("&Load", self)
+		
+		file_menu.addAction(new)
+		file_menu.addAction(save)
+		file_menu.addAction(load)
 
 		self.createSimulationChoice()
 		self.createSimulationSetting()
 		self.createSimulationRunning()
-
-		toolbar.addWidget(background)
 		
-		self.addToolBar(toolbar)
 
 		setting = QToolBar()
 		setting.addWidget(self.SimulationChoice)
 		setting.addWidget(self.SimulationSetting)
 		
-		self.addToolBar(Qt.BottomToolBarArea, setting)
+		self.addToolBar(Qt.RightToolBarArea, setting)
 		
 		self.setCentralWidget(self.grid)
 		
 		self.setFixedSize(1920, 960)
 		self.setWindowTitle("Designer")
 		self.changeStyle('fusion')
+		
 	def changeStyle(self, styleName):
 		QApplication.setStyle(QStyleFactory.create(styleName))
 		self.changePalette()
@@ -132,10 +162,10 @@ class Window(QMainWindow):
 		self.SimulationChoice = QGroupBox("Simulation Type")
 
 		radioButton1 = QRadioButton("Hamiltonian")
-		radioButton1.sim = "Hamiltonian"
+		radioButton1.callsign = "Hamiltonian"
 		radioButton1.toggled.connect(self.TypeOnClicked)
 		radioButton2 = QRadioButton("Feynman")
-		radioButton2.sim = "Feynman"
+		radioButton2.callsign = "Feynman"
 		radioButton2.toggled.connect(self.TypeOnClicked)
 		radioButton1.setChecked(True)
 		
@@ -167,13 +197,24 @@ class Window(QMainWindow):
 		
 		layout = QVBoxLayout()
 		measurement = QCheckBox("Measurement")
+		measurement.toggled.connect(self.TypeOnClicked)
+		measurement.callsign = "measurement"
 		layout.addWidget(measurement)
+		
 		gate_suggestion = QCheckBox("Gate Sugguestion")
+		gate_suggestion.toggled.connect(self.TypeOnClicked)
+		gate_suggestion.callsign = "suggestion"
 		layout.addWidget(gate_suggestion)
+		
 		incremental_saving = QCheckBox("Incremental Saving")
+		incremental_saving.toggled.connect(self.TypeOnClicked)
 		layout.addWidget(incremental_saving)
+		incremental_saving.callsign = "incresav"
+		
 		incremental_simulation = QCheckBox("Incremental Simulation")
+		incremental_simulation.toggled.connect(self.TypeOnClicked)
 		layout.addWidget(incremental_simulation)
+		incremental_simulation.callsign = "incresim"
 		
 		noice_label = QLabel("Noice Model")
 		noice_selection = ["none", "other..."]
@@ -189,12 +230,16 @@ class Window(QMainWindow):
 		
 		num_qubits = QSpinBox(self.SimulationSetting)
 		num_qubits.setValue(5)
+		num_qubits.callsign = "numqubit"
 		qubit_label = QLabel("&Number of Qubits: ")
 		qubit_label.setBuddy(num_qubits)
+		num_qubits.valueChanged.connect(self.UpdateParameters)
 
 		num_width = QSpinBox(self.SimulationSetting)
 		num_width.setValue(8)
+		num_width.callsign = "numwidth"
 		width_label = QLabel("&Width: ")
+		num_width.valueChanged.connect(self.UpdateParameters)
 
 		localSimulation = QLabel("Local Simulation Technique")
 		sim_selection = ["Hamiltionian", "Feynman"]
@@ -217,7 +262,24 @@ class Window(QMainWindow):
 		self.SimulationSetting.setLayout(layout)
 		
 	def TypeOnClicked(self):
-		radioButton = self.sender()
+		Button = self.sender()
+		designer.settings.measurement = Button.isChecked()
+		if (Button.callsign == "measurement"):
+			changeMeasurement(Button.isChecked())
+		elif (Button.callsign == "suggestion"):
+			changeSuggestion(Button.isChecked())
+		elif (Button.callsign == "incresav"):
+			changeIncresav(Button.isChecked())
+		elif (Button.callsign == "incresim"):
+			changeIncresim(Button.isChecked())
+			
+	def UpdateParameters(self):
+		spin = self.sender()
+		val = spin.value()
+		if (spin.callsign == "numqubit"):
+			updateNumQubit(val)
+		elif (spin.callsign == "numwidth"):
+			updateNumWidth(val)
 
 class IndicSelectWindow(QDialog):
 	def __init__(self, parent=None):
@@ -412,6 +474,4 @@ if __name__ == '__main__':
 	app = QApplication(sys.argv)
 	window = Window()
 	window.show()
-	w = IndicSelectWindow()
-	w.show()
 	sys.exit(app.exec_())
