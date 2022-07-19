@@ -117,6 +117,8 @@ class Window(QMainWindow):
 		self.addToolBar(Qt.BottomToolBarArea, setting)
 		
 		self.setCentralWidget(self.grid)
+		
+		self.setFixedSize(1920, 960)
 		self.setWindowTitle("Designer")
 		self.changeStyle('fusion')
 	def changeStyle(self, styleName):
@@ -410,4 +412,6 @@ if __name__ == '__main__':
 	app = QApplication(sys.argv)
 	window = Window()
 	window.show()
+	w = IndicSelectWindow()
+	w.show()
 	sys.exit(app.exec_())
