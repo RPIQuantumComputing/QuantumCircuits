@@ -1,3 +1,4 @@
+import sys, random
 from unittest import skip
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
@@ -6,15 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from matplotlib.figure import Figure
 from PIL import Image
-from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
-
-
-import sys, random
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
 ignoreX = 4 # Always the same
 
@@ -86,36 +79,16 @@ def changeSimulationTechniqueHamiltonian():
 def changeSimulationTechniqueFeynman():
 	designer.settings.backend = "FeynmanSimulation"
 
-class DragButton(QPushButton):
-	def mouseMoveEvent(self, e):
-		if e.buttons() == Qt.LeftButton:
-			drag = QDrag(self)
-			mime = QMimeData()
-			drag.setMimeData(mime)
-			drag.exec_(Qt.MoveAction)
-
-class Setting(QDialog):
-	def dropEvent(self, event):
-		if not event.source().geometry().contains(event.pos()):
-			source = self.get_index(event.pos())
-			if source is None:
-				return
-
-			i, j = max(self.target, source), min(self.target, source)
-			p1, p2 = self.grid.getItemPosition(i), self.grid.getItemPosition(j)
-
-			self.grid.addItem(self.grid.takeAt(i), *p2)
-			self.grid.addItem(self.grid.takeAt(j), *p1)
-
+class Window(QMainWindow):
 	def __init__(self, parent=None):
-		super(Setting, self).__init__(parent)
-		win = QWidget()
+		super(Window, self).__init__(parent)
+		
+		self.grid = IndicSelectWindow()
 		self.originalPalette = QApplication.palette()
 
 		background = QComboBox()
 		background.addItems(QStyleFactory.keys())
 
-		win.setGeometry(100,100,200,100)
 		
 		toolbar = QToolBar("TOOLBAR")
 		toolbar.setIconSize(QSize(20, 20))
@@ -134,17 +107,18 @@ class Setting(QDialog):
 		self.createSimulationRunning()
 
 		toolbar.addWidget(background)
+		
+		self.addToolBar(toolbar)
 
-		main_layout = QGridLayout()
-		main_layout.addWidget(win)
-		main_layout.addWidget(self.SimulationChoice, 1, 1)
-		main_layout.addWidget(self.SimulationSetting, 2, 1)
-		main_layout.setMenuBar(toolbar)
-		self.setLayout(main_layout)
-
+		setting = QToolBar()
+		setting.addWidget(self.SimulationChoice)
+		setting.addWidget(self.SimulationSetting)
+		
+		self.addToolBar(Qt.BottomToolBarArea, setting)
+		
+		self.setCentralWidget(self.grid)
 		self.setWindowTitle("Designer")
 		self.changeStyle('fusion')
-
 	def changeStyle(self, styleName):
 		QApplication.setStyle(QStyleFactory.create(styleName))
 		self.changePalette()
@@ -434,8 +408,6 @@ class IndicSelectWindow(QDialog):
 
 if __name__ == '__main__':
 	app = QApplication(sys.argv)
-	setting = Setting()
-	setting.show()
-	w = IndicSelectWindow()
-	w.show()
+	window = Window()
+	window.show()
 	sys.exit(app.exec_())
