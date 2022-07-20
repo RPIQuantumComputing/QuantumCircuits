@@ -1,4 +1,4 @@
-import sys, random
+import sys, random, os
 from unittest import skip
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
@@ -101,9 +101,17 @@ def updateNumQubit(val):
 	designer.settings.num_qubits = val
 	print("Set number of qubits to " + str(val))
 
+#new
+def updateGUILayout():
+	newgrid = designer.grid
+
+	print("Designer grid: ")
+	print(newgrid)
+
 def updateNumWidth(val):
 	designer.settings.num_width = val
 	print("Set width to " + str(val))
+
 	
 class Window(QMainWindow):
 	def __init__(self, parent=None):
@@ -134,10 +142,13 @@ class Window(QMainWindow):
 		file_menu.addAction(save)
 		file_menu.addAction(load)
 
+		#new
+		save.triggered.connect(lambda: self.saveFile())
+		load.triggered.connect(lambda: self.loadFile())
+
 		self.createSimulationChoice()
 		self.createSimulationSetting()
 		self.createSimulationRunning()
-		
 
 		setting = QToolBar()
 		setting.addWidget(self.SimulationChoice)
@@ -150,7 +161,21 @@ class Window(QMainWindow):
 		self.setFixedSize(1920, 960)
 		self.setWindowTitle("Designer")
 		self.changeStyle('fusion')
-		
+
+	#new
+	def saveFile(self):
+		path=QFileDialog.getSaveFileName(self, "Choose Directory","E:\\")
+		#print(dir_path[0] + ".qc")
+		designer = DesignerFile.Designer()
+		designer.saveSimulationToFile(path[0] + ".qc")
+	
+	#new
+	def loadFile(self):
+		dir_path=QFileDialog.getOpenFileName(self, "Choose .qc file","E:\\")
+		print(dir_path[0])
+		designer.loadSimulationFromFile(dir_path[0])
+		#updateGUILayout()
+
 	def changeStyle(self, styleName):
 		QApplication.setStyle(QStyleFactory.create(styleName))
 		self.changePalette()
