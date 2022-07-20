@@ -9,7 +9,7 @@ import pickle
 import SettingsFile
 import math
 import matplotlib.pyplot as plt
-import cupy as cnp
+import numpy as cnp
 import numpy as np
 import random
 import pandas as pd
@@ -115,6 +115,7 @@ class Designer:
     def loadSimulationFromFile(self, filename="quantumCircuitLatest.qc"):
         with open(filename, 'rb') as fileSave:
             fileFormat = pickle.load(fileSave)
+            #print(fileFormat)
             self.result = fileFormat["results"]
             results = self.result
             fig = plt.figure(figsize=(20, 5))
@@ -123,10 +124,10 @@ class Designer:
             norm = mpl.colors.Normalize(vmin=0, vmax=np.pi)
             cmap = cm.hsv
             m = cm.ScalarMappable(norm=norm, cmap=cmap)
-            for entry in self.result:
+            for entry in results:
                 xVal.append(entry[0][::-1])
-                yVal.append(cnp.asnumpy(entry[1])*100)
-            phases = [m.to_rgba(np.angle(cnp.asnumpy(results[j][2]) * 1j))
+                yVal.append(entry[1]*100)
+            phases = [m.to_rgba(np.angle(results[j][2] * 1j))
                       for j in range(len(results))]
 
             df = pd.DataFrame(

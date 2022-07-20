@@ -2,7 +2,7 @@ from unittest import result
 import SettingsFile
 import math
 import matplotlib.pyplot as plt
-import cupy as np
+import numpy as np
 import numpy as tnp
 import random
 import matplotlib.cm as cm
@@ -286,8 +286,8 @@ class HamiltonionBackend:
         m = cm.ScalarMappable(norm=norm, cmap=cmap)
         for entry in results:
             xVal.append(entry[0][::-1])
-            yVal.append(np.asnumpy(entry[1])*100)
-        phases = [m.to_rgba(tnp.angle(np.asnumpy(results[j][2]) * 1j)) for j in range(len(results))]
+            yVal.append(entry[1]*100)
+        phases = [m.to_rgba(tnp.angle(results[j][2] * 1j)) for j in range(len(results))]
 
         df = pd.DataFrame(
             dict(
