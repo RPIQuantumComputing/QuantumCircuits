@@ -422,9 +422,11 @@ class IndicSelectWindow(QDialog):
 			i, j = max(self.target, source), min(self.target, source)
 			row, col, _, _ = self.gridLayout.getItemPosition(self.target)
 			row2, col2, _, _ = self.gridLayout.getItemPosition(source)
-			p1, p2 = self.gridLayout.getItemPosition(i), self.gridLayout.getItemPosition(j)
-			self.gridLayout.addItem(self.gridLayout.takeAt(i), *p2)
-			self.gridLayout.addItem(self.gridLayout.takeAt(j), *p1)
+			p1, p2 = self.gridLayout.getItemPosition(self.target), self.gridLayout.getItemPosition(source)
+			#self.gridLayout.addItem(self.gridLayout.takeAt(i), *p2)
+			#self.gridLayout.addItem(self.gridLayout.takeAt(j), *p1)
+			#self.gridLayout.takeAt(self.target)
+			#self.gridLayout.takeAt(source)
 			if(self.gridLayout.getItemPosition(self.target)[1] < 3):
 				self.Frame = QFrame(self)
 				self.Frame.setStyleSheet("background-color: white;")
@@ -440,9 +442,12 @@ class IndicSelectWindow(QDialog):
 				self.layout.addWidget(self.canvas)
 				Box = QVBoxLayout()
 				Box.addWidget(self.Frame)
-				self.gridLayout.addLayout(Box, row, col)
+				self.gridLayout.takeAt(source)
+				self.gridLayout.addLayout(Box, row2, col2)
 				grid[row2][col2] = grid[row][col]
 			else:
+				self.gridLayout.addItem(self.gridLayout.takeAt(self.target), *p2)
+				self.gridLayout.addItem(self.gridLayout.takeAt(source), *p1)
 				grid[row][col], grid[row2][col2] = grid[row2][col2], grid[row][col]
 
 			print("Quantum Circuit Printout:")
