@@ -143,7 +143,6 @@ class HamiltonionBackend:
                         #print("Matrix To Apply: ", matrix)
                         #print("Involved Actors: ", circuitOperators[depthCurrent][qubit][1])
                     #for actor in circuitOperators[depthCurrent][qubit][1]:
-                        #print("Actor ", actor, ": ", decomposedState[qubitToIndex[actor]])
                         tempStateVec = np.array([1])
                         applyMatrix = np.array([1])
                         tempAppliedMembers = 0
@@ -162,10 +161,7 @@ class HamiltonionBackend:
                                         applyMatrix = np.kron(applyMatrix, matrix)
                                         tempAppliedMembers += numActors
                         qubitsInvolvedInIndex[qubitToIndex[qubit]] = newQubitsInvolved
-                        #print("Formed State Vector: ", tempStateVec)
-                        #print("Formed Matrix", applyMatrix)
                         decomposedState[qubitToIndex[qubit]] = applyMatrix.dot(tempStateVec)
-                        #print("Result: ", decomposedState[qubitToIndex[qubit]])
 
         temp = []
         for entry in decomposedState:
