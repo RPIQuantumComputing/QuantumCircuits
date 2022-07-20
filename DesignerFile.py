@@ -115,7 +115,7 @@ class Designer:
     def loadSimulationFromFile(self, filename="quantumCircuitLatest.qc"):
         with open(filename, 'rb') as fileSave:
             fileFormat = pickle.load(fileSave)
-            print(fileFormat)
+            #print(fileFormat)
             self.result = fileFormat["results"]
             results = self.result
             fig = plt.figure(figsize=(20, 5))

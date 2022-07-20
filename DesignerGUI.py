@@ -102,17 +102,34 @@ def updateNumQubit(val):
 	print("Set number of qubits to " + str(val))
 
 #new
-def updateGUILayout():
+def updateGrid():
 	newgrid = designer.grid
 
-	print("Designer grid: ")
-	print(newgrid)
+	currentWidth = designer.gridWidth #8
+	currentHeight = designer.gridHeight #5
+	grid = [["-" for i in range(currentWidth + 3)] for j in range(currentHeight)]
+	
+	for j in range(currentHeight):
+		for i in range(currentWidth): 
+			if(newgrid[i][j].getName() == "CNOT"): 
+				grid[i+2][j] == "C"
+				#print("C", end=" | ")
+			else:
+				grid[i+2][j] = newgrid[i][j].getName()
+				#print(newgrid[i][j].getName(), end=" | ")
+		#print("")
+	
+	
+	for i in range(currentHeight):
+		for j in range(currentWidth + 3):
+			print(grid[i][j], end="")
+		print("")
+	
 
 def updateNumWidth(val):
 	designer.settings.num_width = val
 	print("Set width to " + str(val))
 
-	
 class Window(QMainWindow):
 	def __init__(self, parent=None):
 		super(Window, self).__init__(parent)
@@ -165,8 +182,7 @@ class Window(QMainWindow):
 	#new
 	def saveFile(self):
 		path=QFileDialog.getSaveFileName(self, "Choose Directory","E:\\")
-		#print(dir_path[0] + ".qc")
-		designer = DesignerFile.Designer()
+		#print(path[0] + ".qc")
 		designer.saveSimulationToFile(path[0] + ".qc")
 	
 	#new
@@ -174,7 +190,8 @@ class Window(QMainWindow):
 		dir_path=QFileDialog.getOpenFileName(self, "Choose .qc file","E:\\")
 		print(dir_path[0])
 		designer.loadSimulationFromFile(dir_path[0])
-		#updateGUILayout()
+		updateGrid()
+		#self.grid.updateGUILayout()
 
 	def changeStyle(self, styleName):
 		QApplication.setStyle(QStyleFactory.create(styleName))
@@ -497,7 +514,22 @@ class IndicSelectWindow(QDialog):
 				tempStr += "[M]"
 				print(tempStr)
 			print(entry)
-
+	
+	#update layout basesd on designer class' grid
+	def updateGUILayout(self):
+		for i in range(currentWidth): #height
+			for j in range(currentHeight): #width
+				self.figure = Figure()  # a figure to plot on
+				self.canvas = FigureCanvas(self.figure)
+				self.ax = self.figure.add_subplot(111)  # create an axis
+				self.ax.imshow(gateToImage[grid[j][i]])
+				self.ax.set_axis_off()
+				self.canvas.draw()  # refresh canvas
+				self.canvas.installEventFilter(self)
+				self.layout.addWidget(self.canvas)
+				Box = QVBoxLayout()
+				Box.addWidget(self.Frame)
+				self.gridLayout.addLayout(Box, i, j)
 
 
 if __name__ == '__main__':
