@@ -21,6 +21,7 @@ class Designer:
     gridHeight = -1
     gridWidth = -1
     grid = []
+    tempGrid = []
     settings = SettingsFile.Settings()
     result = None
     resultingHistgram = None
@@ -43,6 +44,12 @@ class Designer:
                 tempArray.append(self.visible_gates['-'])
             self.grid.append(tempArray)
 
+    def giveGUIGrid(self, GUI):
+        self.tempGrid = GUI
+
+    def getGUIGrid(self):
+        return self.tempGrid
+
     def gateAddition(self, name, posX, posY):
         if(name not in self.visible_gates):
             print("ERROR: Trying to add gate")
@@ -53,6 +60,7 @@ class Designer:
         for i in range(len(qubits)):
             tempQubits.append(posY + i)
         self.grid[posX][posY].setInvolvedQubits(tempQubits)
+        self.printDesign()
 
     def gateRemoval(self, posX, posY):
         self.grid[posX][posY] = self.visible_gates['-']
@@ -106,16 +114,18 @@ class Designer:
         self.settings.backend = "FeynmanSimulation"
 
     def saveSimulationToFile(self, filename="quantumCircuitLatest.qc"):
+        self.printDesign()
         fileFormat = {"results": self.result,
                       "gate_set": self.visible_gates, "gridWidth": self.gridWidth, "gridHeight": self.gridHeight,
-                      "grid": self.grid, "settings": self.settings}
+                      "grid": self.grid, "settings": self.settings, "GUIGrid": self.tempGrid}
         with open(filename, 'wb') as fileSave:
             pickle.dump(fileFormat, fileSave)
 
     def loadSimulationFromFile(self, filename="quantumCircuitLatest.qc"):
         with open(filename, 'rb') as fileSave:
             fileFormat = pickle.load(fileSave)
-            #print(fileFormat)
+            print(fileFormat)
+            grid = fileFormat["grid"]
             self.result = fileFormat["results"]
             results = self.result
             fig = plt.figure(figsize=(20, 5))
@@ -137,7 +147,6 @@ class Designer:
                     phase=phases
                 )
             )
-
             df_sorted = df.sort_values('x')
             plt.bar(df_sorted['x'], df_sorted['y'],
                     width=0.4, color=df_sorted['phase'])
@@ -153,5 +162,5 @@ class Designer:
             self.visible_gates = fileFormat["gate_set"]
             self.gridWidth = fileFormat["gridWidth"]
             self.gridHeight = fileFormat["gridHeight"]
-            self.grid = fileFormat["grid"]
+            self.tempGrid = fileFormat["GUIGrid"]
             self.settings = fileFormat["settings"]

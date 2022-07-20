@@ -1,3 +1,4 @@
+from glob import glob
 import sys, random, os
 from unittest import skip
 from PyQt5.QtCore import *
@@ -22,6 +23,8 @@ grid = [["-" for i in range(currentWidth + 3)] for j in range(currentHeight)]
 hamiltonian = False
 import DesignerFile
 designer = DesignerFile.Designer()
+
+needToUpdate = False
 
 def inital(row, col):
 	if(row == 0 and col == 0):
@@ -103,27 +106,10 @@ def updateNumQubit(val):
 
 #new
 def updateGrid():
-	newgrid = designer.grid
-
-	currentWidth = designer.gridWidth #8
-	currentHeight = designer.gridHeight #5
-	grid = [["-" for i in range(currentWidth + 3)] for j in range(currentHeight)]
-	
-	for j in range(currentHeight):
-		for i in range(currentWidth): 
-			if(newgrid[i][j].getName() == "CNOT"): 
-				grid[i+2][j] == "C"
-				#print("C", end=" | ")
-			else:
-				grid[i+2][j] = newgrid[i][j].getName()
-				#print(newgrid[i][j].getName(), end=" | ")
-		#print("")
-	
-	
-	for i in range(currentHeight):
-		for j in range(currentWidth + 3):
-			print(grid[i][j], end="")
-		print("")
+	global grid
+	global needToUpdate
+	grid = designer.getGUIGrid()
+	needToUpdate = True
 	
 
 def updateNumWidth(val):
@@ -183,6 +169,8 @@ class Window(QMainWindow):
 	def saveFile(self):
 		path=QFileDialog.getSaveFileName(self, "Choose Directory","E:\\")
 		#print(path[0] + ".qc")
+		designer.giveGUIGrid(grid)
+		designer.runSimulation()
 		designer.saveSimulationToFile(path[0] + ".qc")
 	
 	#new
@@ -191,7 +179,8 @@ class Window(QMainWindow):
 		print(dir_path[0])
 		designer.loadSimulationFromFile(dir_path[0])
 		updateGrid()
-		#self.grid.updateGUILayout()
+		designer.printDesign()
+
 
 	def changeStyle(self, styleName):
 		QApplication.setStyle(QStyleFactory.create(styleName))
@@ -341,9 +330,9 @@ class IndicSelectWindow(QDialog):
 		for j in range(1, 4):
 			for i in range(currentHeight):
 				if(skipThis[0] == i and skipThis[1] == j):
-					grid[j][i] = " "
+					grid[i][j - 1] = " "
 					break
-				grid[i][j] = " "
+				grid[i][j-1] = " "
 				self.Frame = QFrame(self)
 				self.Frame.setStyleSheet("background-color: white;")
 				self.Frame.setFrameStyle(QFrame.Panel | QFrame.Raised)
@@ -444,6 +433,34 @@ class IndicSelectWindow(QDialog):
 			drag.setPixmap(pix)
 			drag.setHotSpot(event.pos())
 			drag.exec_()
+		global needToUpdate
+		global grid
+		if needToUpdate:
+			print("Updating....")
+			needToUpdate = False
+			skipThis = [-1, -1]
+			for i in range(3, currentWidth + 3):
+				for j in range(currentHeight):
+					self.Frame = QFrame(self)
+					self.Frame.setStyleSheet("background-color: white;")
+					self.Frame.setLineWidth(0)
+					self.layout = QHBoxLayout(self.Frame)
+
+					self.figure = Figure()  # a figure to plot on
+					self.canvas = FigureCanvas(self.figure)
+					self.ax = self.figure.add_subplot(111)  # create an axis
+					self.ax.imshow(gateToImage[grid[j][i]])
+					self.ax.set_axis_off()
+					self.canvas.draw()  # refresh canvas
+					self.canvas.installEventFilter(self)
+
+					self.layout.addWidget(self.canvas)
+
+					Box = QVBoxLayout()
+
+					Box.addWidget(self.Frame)
+					self.gridLayout.removeItem(self.gridLayout.itemAtPosition(j, i))
+					self.gridLayout.addLayout(Box, j, i)
 
 
 	def mouseReleaseEvent(self, event):
