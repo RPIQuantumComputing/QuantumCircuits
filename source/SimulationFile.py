@@ -12,7 +12,7 @@ class Simulation:
 
     def __init__(self, newSettings):
         self.settings = newSettings
-        self.backend = BackendFile.BackendFactory(self.settings.backend)
+        self.backend = BackendFile.BackendFactory(self.settings.backend, self.settings)
 
     def sendStateInfo(self, newGridWidth, newGridHeight, newGrid):
         self.gridWidth = newGridWidth

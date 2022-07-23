@@ -111,7 +111,7 @@ class Designer:
         return self.resultingHistgram
 
     def setBackend(self, name):
-        self.settings.backend = "FeynmanSimulation"
+        self.settings.backend = name
 
     def saveSimulationToFile(self, filename="quantumCircuitLatest.qc"):
         self.printDesign()
@@ -127,40 +127,75 @@ class Designer:
             print(fileFormat)
             grid = fileFormat["grid"]
             self.result = fileFormat["results"]
-            results = self.result
-            fig = plt.figure(figsize=(20, 5))
-            xVal = []
-            yVal = []
-            norm = mpl.colors.Normalize(vmin=0, vmax=np.pi)
-            cmap = cm.hsv
-            m = cm.ScalarMappable(norm=norm, cmap=cmap)
-            for entry in results:
-                xVal.append(entry[0][::-1])
-                yVal.append(entry[1]*100)
-            phases = [m.to_rgba(np.angle(results[j][2] * 1j))
-                      for j in range(len(results))]
+            self.settings = fileFormat["settings"]
+            if(self.results != None and self.settings.backend == "HamiltonianSimulation"):
+                results = self.result
+                fig = plt.figure(figsize=(20, 5))
+                xVal = []
+                yVal = []
+                norm = mpl.colors.Normalize(vmin=0, vmax=np.pi)
+                cmap = cm.hsv
+                m = cm.ScalarMappable(norm=norm, cmap=cmap)
+                for entry in results:
+                    xVal.append(entry[0][::-1])
+                    yVal.append(entry[1]*100)
+                phases = [m.to_rgba(np.angle(results[j][2] * 1j)) for j in range(len(results))]
 
-            df = pd.DataFrame(
-                dict(
-                    x=xVal,
-                    y=yVal,
-                    phase=phases
+                df = pd.DataFrame(
+                    dict(
+                        x=xVal,
+                        y=yVal,
+                        phase=phases
+                    )
                 )
-            )
-            df_sorted = df.sort_values('x')
-            plt.bar(df_sorted['x'], df_sorted['y'],
-                    width=0.4, color=df_sorted['phase'])
-            plt.xlabel("Computational Result")
-            plt.ylabel("Probability")
-            rotationAmount = math.floor(90/(1 + np.exp(-(((len(xVal))/3)-5))))
-            plt.xticks(rotation=rotationAmount)
-            cbar = plt.colorbar(m)
-            cbar.set_label('Relative Phase of State (Radians)',
+                df_sorted = df.sort_values('x')
+                plt.bar(df_sorted['x'], df_sorted['y'],
+                        width=0.4, color=df_sorted['phase'])
+                plt.xlabel("Computational Result")
+                plt.ylabel("Probability")
+                rotationAmount = math.floor(90/(1 + np.exp(-(((len(xVal))/3)-5))))
+                plt.xticks(rotation=rotationAmount)
+                cbar = plt.colorbar(m)
+                cbar.set_label('Relative Phase of State (Radians)',
                            rotation=-90, labelpad=20)
-            plt.title("Probability Distribution of Given Quantum Circuit")
-            self.resultingHistgram = plt
+                plt.title("Probability Distribution of Given Quantum Circuit")
+                self.resultingHistgram = plt
+            if(self.results != None and self.settings.backend == "FeynmanSimulation"):
+                fig = plt.figure(figsize = (20, 5))
+                xVal = []
+                yVal = []
+                total = 0
+                for _, y in self.results.items():
+                    total += y
+                for a, b in self.results.items():
+                    xVal.append(a)
+                    yVal.append((b / total) * 100)
+
+                df = pd.DataFrame(
+                    dict(
+                        x=xVal,
+                        y=yVal
+                    )
+                )
+
+                df_sorted = df.sort_values('x')
+                plt.bar(df_sorted['x'], df_sorted['y'], width = 0.4)
+                plt.xlabel("Computational Result")
+                plt.ylabel("Probability")
+                rotationAmount = math.floor(90/(1 + np.exp(-(((len(xVal))/3)-5))))
+                plt.xticks(rotation = rotationAmount)
+                plt.title("Probability Distribution of Given Quantum Circuit")
+                self.histogramResult = plt
             self.visible_gates = fileFormat["gate_set"]
             self.gridWidth = fileFormat["gridWidth"]
             self.gridHeight = fileFormat["gridHeight"]
             self.tempGrid = fileFormat["GUIGrid"]
-            self.settings = fileFormat["settings"]
+    
+    def setObjective(self, string):
+        self.settings.objectiveQUBOS = string
+    
+    def addVariable(self, string):
+        self.settings.variableDeclarationsQUBO.append(string)
+    
+    def addConstraint(self, string):
+        self.settings.constraintsQUBO.append(string)

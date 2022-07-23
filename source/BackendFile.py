@@ -28,7 +28,7 @@ class HamiltonionBackend:
     def __init__(self, newSettings):
         self.settings = newSettings
     
-    def sendAPIToken():
+    def sendAPIToken(api_string):
         pass
     
     def sendRequest(self, gridWidth, gridHeight, grid):
@@ -314,7 +314,7 @@ class FeynmanBackend:
     def __init__(self, newSettings):
         self.settings = newSettings
     
-    def sendAPIToken():
+    def sendAPIToken(api_string):
         pass
     
     def sendRequest(self, gridWidth, gridHeight, grid):
@@ -379,9 +379,55 @@ class FeynmanBackend:
         self.histogramResult = plt
         print(self.results)
 
+class DWaveBackend:
+    provider = "DWave"
+    settings = None
+    histogramResult = None
+    results = None
+    API_Token = "DEV-2a83ec13135e2944cebbeddf32592573221b3937"
+
+    def __init__(self, newSettings):
+        self.settings = newSettings
+    
+    def sendAPIToken(api_string):
+        API_Token = api_string
+    
+    def sendRequest(self, gridWidth, gridHeight, grid):
+        import math
+        import dimod
+        from dimod import Binary, Integer
+        import dwave.inspector
+
+        cqm = dimod.CQM()
+        stop = False
+        for entry in self.settings.variableDeclarationsQUBO:
+            exec(entry)
+        objectiveFunction = self.settings.objectiveQUBOS
+        if("max" in objectiveFunction):
+            eval("cqm.set_objective(" + "-1*(" + objectiveFunction[4:] + ")" + ")")
+        else:
+            eval("cqm.set_objective(" + objectiveFunction[4:] + ")")
+        stop = False
+        for entry in self.settings.constraintsQUBO:
+            eval("cqm.add_constraint(" + entry + ")")
+        from dwave.system import LeapHybridCQMSampler
+        sampler = LeapHybridCQMSampler(token=self.API_Token)     
+        sampleset = sampler.sample_cqm(cqm, label='QuboParsing')
+        sampleset = sampleset.filter(lambda row: row.is_feasible)
+        self.results = sampleset
+        valuesFound = []
+        for energy, in sampleset.data(fields=['energy']):
+            valuesFound.append(energy)
+        fig = plt.figure(figsize = (20, 5))
+        plt.hist(valuesFound)
+        plt.xlabel("Minimum Energy of Solutions")
+        plt.ylabel("Amount of Occurences")
+        self.histogramResult = plt
+
 def BackendFactory(backendType="HamiltionSimulation", settings=SettingsFile.Settings()):
     backendTypes = {
         "HamiltionSimulation" : HamiltonionBackend,
         "FeynmanSimulation" : FeynmanBackend,
+        "DWaveSimulation" : DWaveBackend
     }
     return backendTypes[backendType](settings)

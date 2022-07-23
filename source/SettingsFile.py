@@ -10,3 +10,8 @@ class Settings:
     gate_suggestion = False
     incremental_saving = False
     incremental_simulation = False
+    objectiveQUBOS = ""
+    variableDeclarationsQUBO = []
+    constraintsQUBO = []
+
+
