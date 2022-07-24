@@ -17,6 +17,7 @@ import matplotlib as mpl
 
 
 class Designer:
+    numSinceLastShown = 100
     gridHeight = -1
     gridWidth = -1
     grid = []
@@ -75,6 +76,10 @@ class Designer:
             tempQubits.append(posY + i)
         self.grid[posX][posY].setInvolvedQubits(tempQubits)
         self.printDesign()
+        if(self.numSinceLastShown >= 10 and self.settings.gate_suggestion == True):
+            self.numSinceLastShown = 0
+            self.suggestSimplifications()
+        self.numSinceLastShown += 1
 
     def gateRemoval(self, posX, posY):
         self.grid[posX][posY] = self.visible_gates['-']
