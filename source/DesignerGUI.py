@@ -95,6 +95,7 @@ def changeMeasurement(checked):
 	
 def changeSuggestion(checked):
 	designer.settings.gate_suggestion = checked
+	designer.suggestSimplifications(grid)
 	print("Set gate suggestion to " + str(checked))
 	
 def changeIncresav(checked):

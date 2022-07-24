@@ -222,3 +222,41 @@ class Designer:
     
     def addConstraint(self, string):
         self.settings.constraintsQUBO.append(string)
+
+    def suggestSimplifications(self, grid):
+        starredPositions = {(-1,-1)}
+        from qiskit import QuantumCircuit
+        from qiskit import Aer, transpile
+        circuit = QuantumCircuit(self.gridHeight)
+        for qubit in range(len(grid)):
+            for depth in range(3, len(grid[qubit])):
+                if(grid[qubit][depth] != '-'):
+                    if(grid[qubit][depth] == 'H'):
+                        circuit.h(qubit)
+                    if(grid[qubit][depth] == 'X'):
+                        circuit.x(qubit)
+                    if(grid[qubit][depth] == 'Y'):
+                        circuit.y(qubit)
+                    if(grid[qubit][depth] == 'Z'):
+                        circuit.z(qubit)
+                    if(grid[qubit][depth] == 'S'):
+                        circuit.s(qubit)
+                    if(grid[qubit][depth] == 'T'):
+                        circuit.t(qubit)
+                    if(grid[qubit][depth] == 'CNOT'):
+                        circuit.cnot(qubit, qubit + 1)
+                        qubit += 1
+        circuit.measure_all()
+        print(circuit)
+        backend = Aer.get_backend('statevector_simulator')
+        from qiskit import transpile
+        couplingMapping = []
+        for qubitIdx in range(self.gridHeight - 1):
+            couplingMapping.append([qubitIdx, qubitIdx + 1])
+        simplified = transpile(circuit, backend=backend, coupling_map=couplingMapping, optimization_level=3)
+        simplified.draw(output='mpl', filename='simplified.png') 
+
+        import matplotlib.image as mpimg
+        img = mpimg.imread('simplified.png')
+        imgplot = plt.imshow(img)
+        plt.show()
