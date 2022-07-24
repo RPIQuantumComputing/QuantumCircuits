@@ -9,7 +9,6 @@ import pickle
 import SettingsFile
 import math
 import matplotlib.pyplot as plt
-import numpy as cnp
 import numpy as np
 import random
 import pandas as pd
@@ -33,7 +32,22 @@ class Designer:
                      'Y': GateFile.GateFactory("Individual", 'Y', np.array([[0 + 0.0j, 0-1j], [0+1j, 0 + 0.0j]]), [-1]),
                      'Z': GateFile.GateFactory("Individual", 'Z', np.array([[1 + 0.0j, 0 + 0.0j], [0 + 0.0j, -1 + 0.0j]]), [-1]),
                      'S': GateFile.GateFactory("Individual", 'S', np.array([[1 + 0.0j, 0 + 0.0j], [0 + 0.0j, 0+1j]]), [-1]),
-                     'T': GateFile.GateFactory("Individual", 'T', np.array([[1 + 0.0j, 0 + 0.0j], [0 + 0.0j, 0+np.exp(1j*np.pi/4)]]), [-1])}
+                     'T': GateFile.GateFactory("Individual", 'T', np.array([[1 + 0.0j, 0 + 0.0j], [0 + 0.0j, 0+np.exp(1j*np.pi/4)]]), [-1]),
+                     'PD': GateFile.GateFactory("Individual", 'PD', np.array([0]), [-1]),
+                     'PX': GateFile.GateFactory("Individual", 'PX', np.array([0]), [-1]),
+                     'PZ': GateFile.GateFactory("Individual", 'PZ', np.array([0]), [-1]),
+                     'PS': GateFile.GateFactory("Individual", 'PS', np.array([0]), [-1]),
+                     'PV': GateFile.GateFactory("Individual", 'PV', np.array([0]), [-1]),
+                     'PF': GateFile.GateFactory("Individual", 'PF', np.array([0]), [-1]),
+                     'PBS': GateFile.GateFactory("Multiple", 'PBS', np.array([0]), [-2, -1]),
+                     'PMZ': GateFile.GateFactory("Multiple", 'PMZ', np.array([0]), [-2, -1]),
+                     'PS2': GateFile.GateFactory("Multiple", 'PS2', np.array([0]), [-2, -1]),
+                     'PCX': GateFile.GateFactory("Multiple", 'PCX', np.array([0]), [-2, -1]),
+                     'PCZ': GateFile.GateFactory("Multiple", 'PCZ', np.array([0]), [-2, -1]),
+                     'PCK': GateFile.GateFactory("Multiple", 'PCK', np.array([0]), [-2, -1]),
+                     'PPV': GateFile.GateFactory("Individual", 'PPV', np.array([0]), [-1]),
+                     'PPC': GateFile.GateFactory("Individual", 'PPC', np.array([0]), [-1]),
+                     'PPF': GateFile.GateFactory("Individual", 'PPF', np.array([0]), [-1])}
 
     def __init__(self, newGridHeight=5, newGridWidth=8):
         self.gridHeight = newGridHeight
@@ -71,7 +85,7 @@ class Designer:
         for widthIdx in range(self.gridWidth):
             for heightIdx in range(self.gridHeight):
                 if(self.grid[widthIdx][heightIdx].getName() != '-'):
-                    if(self.grid[widthIdx][heightIdx].getName() == 'CNOT'):
+                    if(len(self.grid[widthIdx][heightIdx].getName()) >= 3 and "PP" not in self.grid[widthIdx][heightIdx].getName()):
                         circuitOperators[widthIdx][heightIdx] = [self.grid[widthIdx][heightIdx].getName(
                         ), self.grid[widthIdx][heightIdx].gate_qubitsInvolved]
                         circuitOperators[widthIdx][heightIdx+1] = [self.grid[widthIdx]
@@ -89,14 +103,14 @@ class Designer:
         for qubit in range(numQubits):
             tempStr = ""
             for depth in range(numDepth):
-                if(circuitOperators[depth][qubit][0] == 'CNOT'):
+                if(len(circuitOperators[depth][qubit][0]) >= 3 and "PP" not in self.grid[widthIdx][heightIdx].getName()):
                     if(qubit == circuitOperators[depth][qubit][1][0]):
-                        tempStr += "[*]"
+                        tempStr += " [*] "
                     else:
-                        tempStr += "[x]"
+                        tempStr += " [x] "
                 else:
                     tempStr += "[" + circuitOperators[depth][qubit][0] + "]"
-            tempStr += "[M]"
+            tempStr += " [M] "
             print(tempStr)
         print(entry)
 
@@ -185,6 +199,15 @@ class Designer:
                 rotationAmount = math.floor(90/(1 + np.exp(-(((len(xVal))/3)-5))))
                 plt.xticks(rotation = rotationAmount)
                 plt.title("Probability Distribution of Given Quantum Circuit")
+                self.histogramResult = plt
+            if(self.results != None and self.settings.backend == "DWaveSimulation"):
+                valuesFound = []
+                for energy, in self.results.data(fields=['energy']):
+                    valuesFound.append(energy)
+                fig = plt.figure(figsize = (20, 5))
+                plt.hist(valuesFound)
+                plt.xlabel("Minimum Energy of Solutions")
+                plt.ylabel("Amount of Occurences")
                 self.histogramResult = plt
             self.visible_gates = fileFormat["gate_set"]
             self.gridWidth = fileFormat["gridWidth"]

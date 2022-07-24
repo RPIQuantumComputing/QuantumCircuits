@@ -8,13 +8,13 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from matplotlib.figure import Figure
 from PIL import Image
+from threading import *
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
-ignoreX = 4 # Always the same
-
+ignoreX = 4
 gateToImage = {" ": Image.open("../assets/EMPTY.png"), "-": Image.open("../assets/GATE.png"), "H": Image.open("../assets/H.png"), 
 				"T": Image.open("../assets/T.png"), "S": Image.open("../assets/S.png"), "X": Image.open("../assets/X.png"), "Y": Image.open("../assets/Y.png"),
-				"Z": Image.open("../assets/Z.png"), "C": Image.open("../assets/CNOT.png")}
+				"Z": Image.open("../assets/Z.png"), "CNOT": Image.open("../assets/CNOT.png")}
 currentWidth = 8
 currentHeight = 5
 offSetHorizontal = 3
@@ -25,25 +25,30 @@ import DesignerFile
 designer = DesignerFile.Designer()
 
 needToUpdate = False
+photonicMode = False
 
 def inital(row, col):
-	if(row == 0 and col == 0):
-		return "H"
-	if(row == 0 and col == 1):
-		return "X"
-	if(row == 1 and col == 0):
-		return "Y"
-	if(row == 1 and col == 1):
-		return "Z"
-	if(row == 2 and col == 0):
-		return "S"
-	if(row == 2 and col == 1):
-		return "T"
-	if(row == 3 and col == 0):
-		return "C"
+	if(photonicMode == False):
+		if(row == 0 and col == 0):
+			return "H"
+		if(row == 0 and col == 1):
+			return "X"
+		if(row == 1 and col == 0):
+			return "Y"
+		if(row == 1 and col == 1):
+			return "Z"
+		if(row == 2 and col == 0):
+			return "S"
+		if(row == 2 and col == 1):
+			return "T"
+		if(row == 3 and col == 0):
+			return "CNOT"
+	else:
+		# Kandan, add all the new gates here to the GUI
+		pass
 	return " "
 
-def runSimulation(self):
+def runSimulation():
 	print("---------------------Running Simulation-------------------------------------")
 	print("Quantum Circuit Printout: ")
 	print(grid)
@@ -61,12 +66,9 @@ def runSimulation(self):
 			if((qubit, depth) in starredPositions):
 				tempStr += "[*]"
 			else:
-				if(grid[qubit][depth] == 'C'):
-					designer.gateAddition("CNOT", depth-3, qubit)
-				else:
-					designer.gateAddition(grid[qubit][depth], depth-3, qubit)
+				designer.gateAddition(grid[qubit][depth], depth-3, qubit)
 				tempStr += "[" + grid[qubit][depth] + "]"
-			if(grid[qubit][depth] == 'C'):
+			if(len(grid[qubit][depth]) >= 3 and "PP" not in grid[qubit][depth]):
 				starredPositions.add((qubit + 1, depth))
 			tempStr += "[M]"
 		print(tempStr)
@@ -83,6 +85,9 @@ def changeSimulationTechniqueHamiltonian():
 def changeSimulationTechniqueFeynman():
 	designer.settings.backend = "FeynmanSimulation"
 	print("Changed to Feynman Simulation")
+def changeSimulationTechniqueQiskit():
+	designer.settings.backend = "Qiskit"
+	print("Changed to Qiskit Backend")
 	
 def changeMeasurement(checked):
 	designer.settings.measurement = checked
@@ -104,13 +109,11 @@ def updateNumQubit(val):
 	designer.settings.num_qubits = val
 	print("Set number of qubits to " + str(val))
 
-#new
 def updateGrid():
 	global grid
 	global needToUpdate
 	grid = designer.getGUIGrid()
-	needToUpdate = True
-	
+	needToUpdate = True	
 
 def updateNumWidth(val):
 	designer.settings.num_width = val
@@ -145,7 +148,6 @@ class Window(QMainWindow):
 		file_menu.addAction(save)
 		file_menu.addAction(load)
 
-		#new
 		save.triggered.connect(lambda: self.saveFile())
 		load.triggered.connect(lambda: self.loadFile())
 
@@ -165,7 +167,6 @@ class Window(QMainWindow):
 		self.setWindowTitle("Designer")
 		self.changeStyle('fusion')
 
-	#new
 	def saveFile(self):
 		path=QFileDialog.getSaveFileName(self, "Choose Directory","E:\\")
 		#print(path[0] + ".qc")
@@ -173,7 +174,6 @@ class Window(QMainWindow):
 		designer.runSimulation()
 		designer.saveSimulationToFile(path[0] + ".qc")
 	
-	#new
 	def loadFile(self):
 		dir_path=QFileDialog.getOpenFileName(self, "Choose .qc file","E:\\")
 		print(dir_path[0])
@@ -206,7 +206,6 @@ class Window(QMainWindow):
 		layout.addStretch(1)
 		self.SimulationChoice.setLayout(layout)
 
-
 	def createSimulationRunning(self):
 		self.SimulationChoice = QGroupBox("Running Simulation")
 		button1 = QPushButton()
@@ -218,10 +217,13 @@ class Window(QMainWindow):
 		self.SimulationChoice.setLayout(layout)
 
 	def updateSimulationTechnique(self, i):
-		if("H" in self.sim_box.currentText()):
+		if("Ham" in self.sim_box.currentText()):
 			changeSimulationTechniqueHamiltonian()
 		else:
-			changeSimulationTechniqueFeynman()
+			if("Qiskit" in self.sim_box.currentText()):
+				changeSimulationTechniqueQiskit()
+			else:
+				changeSimulationTechniqueFeynman()
 
 	def createSimulationSetting(self):
 		self.SimulationSetting = QGroupBox("Simulation Setting")
@@ -246,6 +248,11 @@ class Window(QMainWindow):
 		incremental_simulation.toggled.connect(self.TypeOnClicked)
 		layout.addWidget(incremental_simulation)
 		incremental_simulation.callsign = "incresim"
+
+		photonicMode = QCheckBox("Photonic Mode")
+		photonicMode.toggled.connect(self.TypeOnClicked)
+		layout.addWidget(photonicMode)
+		photonicMode.callsign = "photonic"
 		
 		noice_label = QLabel("Noice Model")
 		noice_selection = ["none", "other..."]
@@ -273,7 +280,7 @@ class Window(QMainWindow):
 		num_width.valueChanged.connect(self.UpdateParameters)
 
 		localSimulation = QLabel("Local Simulation Technique")
-		sim_selection = ["Hamiltionian", "Feynman"]
+		sim_selection = ["Hamiltionian", "Feynman", "Qiskit"]
 		self.sim_box = QComboBox()
 		self.sim_box.currentIndexChanged.connect(self.updateSimulationTechnique)
 
@@ -303,6 +310,12 @@ class Window(QMainWindow):
 			changeIncresav(Button.isChecked())
 		elif (Button.callsign == "incresim"):
 			changeIncresim(Button.isChecked())
+		elif (Button.callsign == "photonic"):
+			print("Update to Photonic Mode...")
+			global photonicMode
+			photonicMode = not photonicMode
+			global needToUpdate 
+			needToUpdate = True
 			
 	def UpdateParameters(self):
 		spin = self.sender()
@@ -526,7 +539,7 @@ class IndicSelectWindow(QDialog):
 						tempStr += "[*]"
 					else:
 						tempStr += "[" + grid[qubit][depth] + "]"
-					if(grid[qubit][depth] == 'C'):
+					if(len(grid[qubit][depth]) >= 3 and "PP" not in grid[qubit][depth]):
 						starredPositions.add((qubit + 1, depth))
 				tempStr += "[M]"
 				print(tempStr)

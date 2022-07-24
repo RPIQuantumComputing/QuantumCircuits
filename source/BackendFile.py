@@ -1,8 +1,14 @@
+from turtle import width
 from unittest import result
 import SettingsFile
 import math
 import matplotlib.pyplot as plt
-import numpy as np
+
+hasCupy = True
+try:
+    import cupy as np
+except:
+    import numpy as np
 import numpy as tnp
 import random
 import matplotlib.cm as cm
@@ -28,7 +34,7 @@ class HamiltonionBackend:
     def __init__(self, newSettings):
         self.settings = newSettings
     
-    def sendAPIToken(api_string):
+    def sendAPIToken():
         pass
     
     def sendRequest(self, gridWidth, gridHeight, grid):
@@ -268,12 +274,7 @@ class HamiltonionBackend:
                 results.append([initalString, probability, phase])
             
         results = []
-        if(self.settings.shots != -1):
-            getWeightedProbabilities(results)
-        else:
-            start = "0"*numQubits
-            getAllPossibilities(results)
-
+        getAllPossibilities(results)
         fig = plt.figure(figsize = (20, 5))
         xVal = []
         yVal = []
@@ -282,8 +283,8 @@ class HamiltonionBackend:
         m = cm.ScalarMappable(norm=norm, cmap=cmap)
         for entry in results:
             xVal.append(entry[0][::-1])
-            yVal.append(entry[1]*100)
-        phases = [m.to_rgba(tnp.angle(results[j][2] * 1j)) for j in range(len(results))]
+            yVal.append(entry[1].get()*100)
+        phases = [m.to_rgba(tnp.angle(results[j][2].get() * 1j)) for j in range(len(results))]
 
         df = pd.DataFrame(
             dict(
@@ -389,8 +390,8 @@ class DWaveBackend:
     def __init__(self, newSettings):
         self.settings = newSettings
     
-    def sendAPIToken(api_string):
-        API_Token = api_string
+    def sendAPIToken(self, api_string):
+        self.API_Token = api_string
     
     def sendRequest(self, gridWidth, gridHeight, grid):
         import math
@@ -424,10 +425,196 @@ class DWaveBackend:
         plt.ylabel("Amount of Occurences")
         self.histogramResult = plt
 
+class XanaduBackend:
+    provider = "Xandadu"
+    settings = None
+    histogramResult = None
+    results = None
+    API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICIwYTdjOGE5Yi1lMzdkLTQ0MzItOTU2OC0xNzI3YzEwNmYyMzEifQ.eyJpYXQiOjE2NTg2MTU5MzUsImp0aSI6IjE5NDNmYTU5LWYxZmMtNDczZS04ZDliLThjZGE2MGVmOGE5MyIsImlzcyI6Imh0dHBzOi8vcGxhdGZvcm0ueGFuYWR1LmFpL2F1dGgvcmVhbG1zL3BsYXRmb3JtIiwiYXVkIjoiaHR0cHM6Ly9wbGF0Zm9ybS54YW5hZHUuYWkvYXV0aC9yZWFsbXMvcGxhdGZvcm0iLCJzdWIiOiJmMmIwYmJkYi05NzJkLTRiZDgtYjZhOS0xNTU3MWY4NDVlNjMiLCJ0eXAiOiJPZmZsaW5lIiwiYXpwIjoicHVibGljIiwic2Vzc2lvbl9zdGF0ZSI6ImIyNTI4ZmZlLTUwNzUtNDMwYy05YWZkLTdiZDA0MmI1ZTEwYyIsInNjb3BlIjoicHVibGljLXJvbGVzIHByb2ZpbGUgZW1haWwgb2ZmbGluZV9hY2Nlc3MiLCJzaWQiOiJiMjUyOGZmZS01MDc1LTQzMGMtOWFmZC03YmQwNDJiNWUxMGMifQ.c0wXKPXBCqfB9hOoFCe7-Fp-oSJ8wY2Sa_Sgvmn4-Oc"
+
+    def __init__(self, newSettings):
+        self.settings = newSettings
+    
+    def sendAPIToken(self, api_string):
+        self.API_KEY = api_string
+    
+    def sendRequest(self, gridWidth, gridHeight, grid):
+        circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
+        for widthIdx in range(gridWidth):
+            for heightIdx in range(gridHeight):
+                if(grid[widthIdx][heightIdx].getName() != '-'):
+                    if("PP" not in grid[widthIdx][heightIdx].getName() or len(grid[widthIdx][heightIdx].getName()) >= 3):
+                        circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
+                        circuitOperators[widthIdx][heightIdx+1] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
+                    else:
+                        circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
+        numQubits = gridHeight
+        import strawberryfields as sf
+        from strawberryfields import ops
+        
+        measurementType = ["F" for i in range(numQubits)]
+        circuit = sf.Program(numQubits)
+        with circuit.context as q:
+            for widthIdx in range(gridWidth):
+                for heightIdx in range(gridHeight):
+                    if(grid[widthIdx][heightIdx].getName() != '-'):
+                        if(grid[widthIdx][heightIdx].getName() == "PD"):
+                            ops.Dgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0], self.settings.specialGridSettings[(widthIdx, heightIdx)][1]) | q[widthIdx]
+                        if(grid[widthIdx][heightIdx].getName() == "PX"):
+                            ops.Xgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | q[widthIdx]
+                        if(grid[widthIdx][heightIdx].getName() == "PZ"):
+                            ops.Zgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | q[widthIdx]
+                        if(grid[widthIdx][heightIdx].getName() == "PS"):
+                            ops.Sgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | q[widthIdx]
+                        if(grid[widthIdx][heightIdx].getName() == "PR"):
+                            ops.Rgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | q[widthIdx]
+                        if(grid[widthIdx][heightIdx].getName() == "PP"):
+                            ops.Pgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | q[widthIdx]
+                        if(grid[widthIdx][heightIdx].getName() == "PV"):
+                            ops.Vgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | q[widthIdx]
+                        if(grid[widthIdx][heightIdx].getName() == "PF"):
+                            ops.Fouriergate() | q[widthIdx]
+                        if(grid[widthIdx][heightIdx].getName() == "PPV"):
+                            ops.Vaccum() | q[widthIdx]
+                        if(grid[widthIdx][heightIdx].getName() == "PPC"):
+                            ops.Coherent(self.settings.specialGridSettings[(widthIdx, heightIdx)][0], self.settings.specialGridSettings[(widthIdx, heightIdx)][1]) | q[widthIdx]
+                        if(grid[widthIdx][heightIdx].getName() == "PPF"):
+                            ops.Fock(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | q[widthIdx]
+                        if(grid[widthIdx][heightIdx].getName() == "PBS"):
+                            ops.BSgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0], self.settings.specialGridSettings[(widthIdx, heightIdx)][1]) | (q[widthIdx], q[widthIdx + 1])
+                            heightIdx += 1
+                        if(grid[widthIdx][heightIdx].getName() == "PMZ"):
+                            ops.MZgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0], self.settings.specialGridSettings[(widthIdx, heightIdx)][1]) | (q[widthIdx], q[widthIdx + 1])
+                            heightIdx += 1
+                        if(grid[widthIdx][heightIdx].getName() == "PS2"):
+                            ops.S2gate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0], self.settings.specialGridSettings[(widthIdx, heightIdx)][1]) | (q[widthIdx], q[widthIdx + 1])
+                            heightIdx += 1
+                        if(grid[widthIdx][heightIdx].getName() == "PCX"):
+                            ops.CXgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | (q[widthIdx], q[widthIdx + 1])
+                            heightIdx += 1
+                        if(grid[widthIdx][heightIdx].getName() == "PCZ"):
+                            ops.CZgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | (q[widthIdx], q[widthIdx + 1])
+                            heightIdx += 1
+                        if(grid[widthIdx][heightIdx].getName() == "PCK"):
+                            ops.CKgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | (q[widthIdx], q[widthIdx + 1])
+                            heightIdx += 1
+            ops.MeasureFock() | q
+
+        import xcc
+        from strawberryfields import RemoteEngine
+        xcc.Settings(REFRESH_TOKEN=self.API_KEY).save()
+        import xcc.commands
+        xcc.commands.ping()
+
+        eng = RemoteEngine("simulon_gaussian")
+        results = eng.run(circuit, shots=100)
+
+        result = {}
+        for entry in results.samples:
+            s = ""
+            for item in entry:
+                s += str(item) + ","
+            if(s[:len(s)-1] not in result):
+                result[s[:len(s)-1]] = 1
+            else:
+                result[s[:len(s)-1]] += 1
+        fig = plt.figure(figsize = (20, 5))
+        plt.bar(result.keys(), result.values(), 1, color='b')
+        plt.xlabel("Fock Measurement State (binary representation for 'qubit' analysis")
+        plt.ylabel("Occurences")
+        self.histogramResult = plt
+        self.results = result
+
+class QiskitBackend:
+    provider = "Qiskit"
+    settings = None
+    histogramResult = None
+    results = None
+    API_KEY = "55b82f2dcb56e1a96a368905f14504a9c229c9cc212ab7b7f46039e087d54e201c3205f07ba1efed86d880fb82635a630803b072669020cd6eb43589f1abaa0d"
+
+
+    def __init__(self, newSettings):
+        self.settings = newSettings
+    
+    def sendAPIToken(self, api_string):
+        self.API_KEY = api_string
+    
+    def sendRequest(self, gridWidth, gridHeight, grid):
+        circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
+        for widthIdx in range(gridWidth):
+            for heightIdx in range(gridHeight):
+                if(grid[widthIdx][heightIdx].getName() != '-'):
+                    if(grid[widthIdx][heightIdx].getName() == 'CNOT'):
+                        circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
+                        circuitOperators[widthIdx][heightIdx+1] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
+                    else:
+                        circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
+        numQubits = gridHeight
+        numDepth = gridWidth
+        circuit = QuantumCircuit(numQubits)
+        for widthIdx in range(gridWidth):
+            circuitLayer = []
+            for heightIdx in range(gridHeight):
+                if(grid[widthIdx][heightIdx].getName() != '-'):
+                    if(grid[widthIdx][heightIdx].getName() == 'H'):
+                        circuit.h(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'X'):
+                        circuit.x(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'Y'):
+                        circuit.y(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'Z'):
+                        circuit.z(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'S'):
+                        circuit.s(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'T'):
+                        circuit.t(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'CNOT'):
+                        circuit.cnot(heightIdx, heightIdx + 1)
+                        heightIdx += 1
+        circuit.measure_all()
+        from qiskit import IBMQ
+        from qiskit.compiler import transpile, assemble
+        IBMQ.save_account(self.API_KEY, overwrite=True)
+        provider = IBMQ.load_account()
+        backend = provider.get_backend('ibmq_qasm_simulator')
+        transpiled = transpile(circuit, backend=backend)
+        qobj = assemble(transpiled, backend=backend, shots=1024)
+        job = backend.run(qobj)
+        print(job.status())
+        self.results = job.result().get_counts(circuit)
+        fig = plt.figure(figsize = (20, 5))
+        xVal = []
+        yVal = []
+        total = 0
+        for _, y in self.results.items():
+            total += y
+        for a, b in self.results.items():
+            xVal.append(a)
+            yVal.append((b / total) * 100)
+
+        df = pd.DataFrame(
+            dict(
+                x=xVal,
+                y=yVal
+            )
+        )
+
+        df_sorted = df.sort_values('x')
+        plt.bar(df_sorted['x'], df_sorted['y'], width = 0.4)
+        plt.xlabel("Computational Result")
+        plt.ylabel("Probability")
+        rotationAmount = math.floor(90/(1 + np.exp(-(((len(xVal))/3)-5))))
+        plt.xticks(rotation = rotationAmount)
+        plt.title("Probability Distribution of Given Quantum Circuit")
+        self.histogramResult = plt
+        print(self.results)
+
 def BackendFactory(backendType="HamiltionSimulation", settings=SettingsFile.Settings()):
     backendTypes = {
         "HamiltionSimulation" : HamiltonionBackend,
         "FeynmanSimulation" : FeynmanBackend,
-        "DWaveSimulation" : DWaveBackend
+        "DWaveSimulation" : DWaveBackend,
+        "Photonic": XanaduBackend,
+        "Qiskit": QiskitBackend
     }
     return backendTypes[backendType](settings)

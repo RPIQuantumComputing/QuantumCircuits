@@ -13,5 +13,5 @@ class Settings:
     objectiveQUBOS = ""
     variableDeclarationsQUBO = []
     constraintsQUBO = []
-
+    specialGridSettings = {(-1, -1): [-1, -1]}
 
