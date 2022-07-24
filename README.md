@@ -9,4 +9,4 @@ Current Feature Set:
   2) Friendly drag and drop GUI interface
   3) Dave and load ".qc" files
   4) Run Constraint Quadratic Optimization problems on DWave's Quantum Annealer
-  5) Use Xanadu's Photonic Quanutm Computer
+  5) Use Xanadu's Photonic Quanutm Computer and IBM's Quantum Computers
