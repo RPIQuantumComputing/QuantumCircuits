@@ -7,8 +7,4 @@ Introduction:
 Current Feature Set:
   1) Local CPU/GPU Hamiltonian/Feynman-like Simulation Capacities
   2) Friendly drag and drop GUI interface
-  3) Dave and load ".qc" files
-  4) Run Constraint Quadratic Optimization problems on DWave's Quantum Annealer
-  5) Use Xanadu's Photonic Quanutm Computer to run circuit
-  6) Use IBM's Quantum Computers to run circuit
-  7) Recommends modifications to Gate-Model quantum computing circuits
+  3) Ability to save and load ".qc" files

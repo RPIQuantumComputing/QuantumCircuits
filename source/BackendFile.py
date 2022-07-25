@@ -402,15 +402,18 @@ class DWaveBackend:
         cqm = dimod.CQM()
         stop = False
         for entry in self.settings.variableDeclarationsQUBO:
-            exec(entry)
+        	if(len(entry) > 1):
+        		exec(entry)
         objectiveFunction = self.settings.objectiveQUBOS
+        print(self.settings.objectiveQUBOS)
         if("max" in objectiveFunction):
             eval("cqm.set_objective(" + "-1*(" + objectiveFunction[4:] + ")" + ")")
         else:
             eval("cqm.set_objective(" + objectiveFunction[4:] + ")")
         stop = False
         for entry in self.settings.constraintsQUBO:
-            eval("cqm.add_constraint(" + entry + ")")
+        	if(len(entry) > 1):
+        		eval("cqm.add_constraint(" + entry + ")")
         from dwave.system import LeapHybridCQMSampler
         sampler = LeapHybridCQMSampler(token=self.API_Token)     
         sampleset = sampler.sample_cqm(cqm, label='QuboParsing')
