@@ -8,3 +8,7 @@ Current Feature Set:
   1) Local CPU/GPU Hamiltonian/Feynman-like Simulation Capacities
   2) Friendly drag and drop GUI interface
   3) Ability to save and load ".qc" files
+  5) Use Xanadu's Photonic Quantum Computer to run circuit
+  6) Use IBM's Quantum Computers to run circuit
+  7) Allows QUBO specification to be run on DWave's Quantum Annealer
+  8) Recommends modifications to Standard Gate-Model quantum computing circuits
