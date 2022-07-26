@@ -460,8 +460,10 @@ class Window(QMainWindow):
         val = spin.value()
         if (spin.callsign == "numqubit"):
             updateNumQubit(val)
+            forceUpdate()
         elif (spin.callsign == "numwidth"):
             updateNumWidth(val)
+            forceUpdate()
 
     #let Dwave input tab show when user clicks on toolbar
     def showDWaveTab(self):
