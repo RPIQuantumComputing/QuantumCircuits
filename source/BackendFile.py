@@ -478,7 +478,7 @@ class XanaduBackend:
                         if(grid[widthIdx][heightIdx].getName() == "PF"):
                             ops.Fouriergate() | q[widthIdx]
                         if(grid[widthIdx][heightIdx].getName() == "PPV"):
-                            ops.Vaccum() | q[widthIdx]
+                            ops.Vacuum() | q[widthIdx]
                         if(grid[widthIdx][heightIdx].getName() == "PPC"):
                             ops.Coherent(self.settings.specialGridSettings[(widthIdx, heightIdx)][0], self.settings.specialGridSettings[(widthIdx, heightIdx)][1]) | q[widthIdx]
                         if(grid[widthIdx][heightIdx].getName() == "PPF"):
@@ -511,7 +511,8 @@ class XanaduBackend:
 
         eng = RemoteEngine("simulon_gaussian")
         results = eng.run(circuit, shots=100)
-
+        print("Got Results")
+        print(results)
         result = {}
         for entry in results.samples:
             s = ""
@@ -521,10 +522,12 @@ class XanaduBackend:
                 result[s[:len(s)-1]] = 1
             else:
                 result[s[:len(s)-1]] += 1
+        print("Saved values...")
         fig = plt.figure(figsize = (20, 5))
         plt.bar(result.keys(), result.values(), 1, color='b')
         plt.xlabel("Fock Measurement State (binary representation for 'qubit' analysis")
         plt.ylabel("Occurences")
+        print("Saving Values...")
         self.histogramResult = plt
         self.results = result
 

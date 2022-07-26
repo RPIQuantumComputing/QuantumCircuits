@@ -10,19 +10,26 @@ from matplotlib.figure import Figure
 from PIL import Image
 from threading import *
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from PyQt5 import QtCore, QtGui, QtWidgets
 
 ignoreX = 4
 gateToImage = {" ": Image.open("../assets/EMPTY.png"), "-": Image.open("../assets/GATE.png"), "H": Image.open("../assets/H.png"), 
                 "T": Image.open("../assets/T.png"), "S": Image.open("../assets/S.png"), "X": Image.open("../assets/X.png"), "Y": Image.open("../assets/Y.png"),
-                "Z": Image.open("../assets/Z.png"), "CNOT": Image.open("../assets/CNOT.png")}
+                "Z": Image.open("../assets/Z.png"), "CNOT": Image.open("../assets/CNOT.png"),
+               "PBS": Image.open("../assets/PBS.png"), "PCK": Image.open("../assets/PCK.png"), "PCX": Image.open("../assets/PCX.png"),
+               "PCZ": Image.open("../assets/PCZ.png"), "PD": Image.open("../assets/PD.png"), "PF": Image.open("../assets/PF.png"),
+               "PMZ": Image.open("../assets/PMZ.png"), "PPC": Image.open("../assets/PPC.png"), "PPF": Image.open("../assets/PPF.png"),
+               "PPV": Image.open("../assets/PPV.png"), "PS": Image.open("../assets/PS.png"), "PS2": Image.open("../assets/PS2.png"),
+               "PV": Image.open("../assets/PV.png"), "PX": Image.open("../assets/PX.png"), "PZ": Image.open("../assets/PZ.png")}
 currentWidth = 8
-currentHeight = 5
+currentHeight = 6
 offSetHorizontal = 3
-grid = [["-" for i in range(currentWidth + 3)] for j in range(currentHeight)]
+grid = [["-" for i in range(currentWidth + offSetHorizontal)] for j in range(currentHeight)]
+priorBarrier = [-1,-1,-1,-1]
 
 hamiltonian = False
 import DesignerFile
-designer = DesignerFile.Designer()
+designer = DesignerFile.Designer(currentHeight, currentWidth)
 
 needToUpdate = False
 photonicMode = False
@@ -30,6 +37,12 @@ photonicMode = False
 DWaveVar = ""
 DWaveCon = ""
 DwaveObjective = ""
+
+def forceUpdate():
+    global window
+    window.close()
+    window = Window()
+    window.show()
 
 def inital(row, col):
     if(photonicMode == False):
@@ -48,8 +61,34 @@ def inital(row, col):
         if(row == 3 and col == 0):
             return "CNOT"
     else:
-        # Kandan, add all the new gates here to the GUI
-        pass
+        if(row == 0 and col == 0):
+            return "PX"
+        if(row == 0 and col == 1):
+            return "PZ"
+        if(row == 0 and col == 2):
+            return "PX"
+        if(row == 0 and col == 3):
+            return "PS"
+        if(row == 1 and col == 0):
+            return "PS2"
+        if(row == 1 and col == 1):
+            return "PMZ"
+        if(row == 1 and col == 2):
+            return "PCX"
+        if(row == 1 and col == 3):
+            return "PD"
+        if(row == 2 and col == 0):
+            return "PF"
+        if(row == 2 and col == 1):
+            return "PBS"
+        if(row == 2 and col == 2):
+            return "PCK"
+        if(row == 2 and col == 3):
+            return "PPC"
+        if(row == 3 and col == 0):
+            return "PPF"
+        if(row == 3 and col == 1):
+            return "PPV"
     return " "
 
 
@@ -101,11 +140,11 @@ def runSimulation():
         for qubit in range(numQubits):
             tempStr = ""
             nextOne = False
-            for depth in range(3, numDepth):
+            for depth in range(offSetHorizontal, numDepth):
                 if((qubit, depth) in starredPositions):
                     tempStr += "[*]"
                 else:
-                    designer.gateAddition(grid[qubit][depth], depth-3, qubit)
+                    designer.gateAddition(grid[qubit][depth], depth-offSetHorizontal, qubit)
                     tempStr += "[" + grid[qubit][depth] + "]"
                 if(len(grid[qubit][depth]) >= 3 and "PP" not in grid[qubit][depth]):
                     starredPositions.add((qubit + 1, depth))
@@ -134,6 +173,9 @@ def changeSimulationTechniqueIBM():
 def changeSimulationTechniqueQiskit():
     designer.setBackend("Qiskit")
     print("Changed to Qiskit Backend")
+def changeSimulationTechniqueXanadu():
+    designer.setBackend("Photonic")
+    print("Changed to Xanadu Photonic Backend")
 
 def changeMeasurement(checked):
     designer.settings.measurement = checked
@@ -280,6 +322,10 @@ class Window(QMainWindow):
             if self.external_sim_msg.msg_toggle:
                 self.external_sim_msg.exec()
             changeSimulationTechniqueQiskit()
+        elif("X" in self.sim_box.currentText()):
+            if self.external_sim_msg.msg_toggle:
+                self.external_sim_msg.exec()
+            changeSimulationTechniqueXanadu()
         else:
             if self.external_sim_msg.msg_toggle:
                 self.external_sim_msg.exec()
@@ -364,7 +410,7 @@ class Window(QMainWindow):
         self.external_sim_msg.buttonClicked.connect(self.externalMsgToggle)
 
         Simulation = QLabel("Simulation Technique")
-        sim_selection = ["Hamiltionian", "Feynman", "DWave Ocean", "Qiskit", "IBM Xanadu"]
+        sim_selection = ["Hamiltionian", "Feynman", "DWave Ocean", "Qiskit", "IBM", "Xanadu"]
         self.sim_box = QComboBox()
         self.sim_box.addItems(sim_selection)
         self.sim_box.currentIndexChanged.connect(self.updateSimulationTechnique)
@@ -398,9 +444,16 @@ class Window(QMainWindow):
         elif (Button.callsign == "photonic"):
             print("Update to Photonic Mode...")
             global photonicMode
+            global offSetHorizontal
+            global grid
+            global currentWidth
+            global currentHeight
             photonicMode = not photonicMode
-            global needToUpdate 
-            needToUpdate = True
+            offSetHorizontal = 5
+            grid = [["-" for i in range(currentWidth + offSetHorizontal)] for j in range(currentHeight)]
+            global needToUpdate
+            needToUpdate = False
+            forceUpdate()
 
     def UpdateParameters(self):
         spin = self.sender()
@@ -483,7 +536,7 @@ class IndicSelectWindow(QDialog):
 
 
         skipThis = [-1, -1]
-        for j in range(1, 4):
+        for j in range(1, offSetHorizontal + 1):
             for i in range(currentHeight):
                 if(skipThis[0] == i and skipThis[1] == j):
                     grid[i][j - 1] = " "
@@ -498,11 +551,13 @@ class IndicSelectWindow(QDialog):
                 self.figure = Figure()  # a figure to plot on
                 self.canvas = FigureCanvas(self.figure)
                 self.ax = self.figure.add_subplot(111)  # create an axis
-                if(j == 3):
+                if(j == offSetHorizontal):
                     self.Frame.setStyleSheet("background-color: grey;")
                     Box = QVBoxLayout()
                     Box.addWidget(self.Frame)
-                    self.gridLayout.addLayout(Box, i, j - 1, 3, 1)
+                    self.gridLayout.addLayout(Box, i, j-1, len(grid)-2, 1)
+                    global priorBarrier
+                    priorBarrier = [i, j - 1, len(grid)-2, 1]
                 else:
                     grid[i][j - 1] = inital(i, j - 1)
                     self.ax.imshow(gateToImage[grid[i][j - 1]])
@@ -513,7 +568,7 @@ class IndicSelectWindow(QDialog):
                     Box = QVBoxLayout()
                     Box.addWidget(self.Frame)
                     self.gridLayout.addLayout(Box, i, j - 1)
-        for i in range(3, currentWidth + 3):
+        for i in range(offSetHorizontal, currentWidth + offSetHorizontal):
             for j in range(currentHeight):
                 grid[j][i] = "-"
                 self.Frame = QFrame(self)
@@ -595,7 +650,7 @@ class IndicSelectWindow(QDialog):
             print("Updating....")
             needToUpdate = False
             skipThis = [-1, -1]
-            for i in range(3, currentWidth + 3):
+            for i in range(offSetHorizontal, currentWidth + offSetHorizontal):
                 for j in range(currentHeight):
                     self.Frame = QFrame(self)
                     self.Frame.setStyleSheet("background-color: white;")
@@ -634,15 +689,25 @@ class IndicSelectWindow(QDialog):
             if source is None:
                 return
 
+
             i, j = max(self.target, source), min(self.target, source)
             row, col, _, _ = self.gridLayout.getItemPosition(self.target)
             row2, col2, _, _ = self.gridLayout.getItemPosition(source)
+            global photonicMode
+            if (photonicMode == True):
+                val1, val2 = 0.0, 0.0
+                val1 = QtWidgets.QInputDialog.getDouble(self, 'First Gate Argument', 'Input:')[0]
+                val2 = QtWidgets.QInputDialog.getDouble(self, 'Second Gate Argument', 'Input:')[0]
+                global designer
+                global offSetHorizontal
+                designer.settings.specialGridSettings[(col2-offSetHorizontal,row2)] = [val1, val2]
+                print(designer.settings.specialGridSettings)
             p1, p2 = self.gridLayout.getItemPosition(self.target), self.gridLayout.getItemPosition(source)
             #self.gridLayout.addItem(self.gridLayout.takeAt(i), *p2)
             #self.gridLayout.addItem(self.gridLayout.takeAt(j), *p1)
             #self.gridLayout.takeAt(self.target)
             #self.gridLayout.takeAt(source)
-            if(self.gridLayout.getItemPosition(self.target)[1] < 3):
+            if(self.gridLayout.getItemPosition(self.target)[1] < offSetHorizontal):
                 self.Frame = QFrame(self)
                 self.Frame.setStyleSheet("background-color: white;")
                 self.Frame.setLineWidth(0)
@@ -677,7 +742,7 @@ class IndicSelectWindow(QDialog):
             for qubit in range(numQubits):
                 tempStr = ""
                 nextOne = False
-                for depth in range(3, numDepth):
+                for depth in range(offSetHorizontal, numDepth + offSetHorizontal):
                     if((qubit, depth) in starredPositions):
                         tempStr += "[*]"
                     else:
@@ -690,23 +755,69 @@ class IndicSelectWindow(QDialog):
 
     #update layout basesd on designer class' grid
     def updateGUILayout(self):
-        for i in range(currentWidth): #height
-            for j in range(currentHeight): #width
+        global priorBarrier
+        global offSetHorizontal
+        global grid
+        global currentHeight
+        global currentWidth
+        skipThis = [-1, -1]
+        for j in range(1, offSetHorizontal + 1):
+            for i in range(currentHeight):
+                if(skipThis[0] == i and skipThis[1] == j):
+                    grid[i][j - 1] = " "
+                    break
+                grid[i][j-1] = " "
+                self.Frame = QFrame(self)
+                self.Frame.setStyleSheet("background-color: white;")
+                self.Frame.setFrameStyle(QFrame.Panel | QFrame.Raised)
+                self.Frame.setLineWidth(0)
+                self.layout = QHBoxLayout(self.Frame)
+
                 self.figure = Figure()  # a figure to plot on
                 self.canvas = FigureCanvas(self.figure)
                 self.ax = self.figure.add_subplot(111)  # create an axis
-                self.ax.imshow(gateToImage[grid[j][i]])
+                if(j == offSetHorizontal):
+                    self.Frame.setStyleSheet("background-color: grey;")
+                    Box = QVBoxLayout()
+                    Box.addWidget(self.Frame)
+                    self.gridLayout.addLayout(Box, i, j-1, len(grid)-2, 1)
+                    priorBarrier = [i, j-1, len(grid)-2, 1]
+                else:
+                    grid[i][j - 1] = inital(i, j - 1)
+                    self.ax.imshow(gateToImage[grid[i][j - 1]])
+                    self.ax.set_axis_off()
+                    self.canvas.draw()  # refresh canvas
+                    self.layout.addWidget(self.canvas)
+                    self.canvas.installEventFilter(self)
+                    Box = QVBoxLayout()
+                    Box.addWidget(self.Frame)
+                    self.gridLayout.addLayout(Box, i, j - 1)
+        for i in range(offSetHorizontal, currentWidth + offSetHorizontal):
+            for j in range(currentHeight):
+                grid[j][i] = "-"
+                self.Frame = QFrame(self)
+                self.Frame.setStyleSheet("background-color: white;")
+                self.Frame.setLineWidth(0)
+                self.layout = QHBoxLayout(self.Frame)
+
+                self.figure = Figure()  # a figure to plot on
+                self.canvas = FigureCanvas(self.figure)
+                self.ax = self.figure.add_subplot(111)  # create an axis
+                self.ax.imshow(gateToImage["-"])
                 self.ax.set_axis_off()
                 self.canvas.draw()  # refresh canvas
                 self.canvas.installEventFilter(self)
+
                 self.layout.addWidget(self.canvas)
+
                 Box = QVBoxLayout()
+
                 Box.addWidget(self.Frame)
-                self.gridLayout.addLayout(Box, i, j)
+
+                self.gridLayout.addLayout(Box, j, i)
 
 
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    window = Window()
-    window.show()
-    sys.exit(app.exec_()) 
+app = QApplication(sys.argv)
+window = Window()
+window.show()
+sys.exit(app.exec_())
