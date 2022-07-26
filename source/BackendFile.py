@@ -89,9 +89,9 @@ class HamiltonionBackend:
         def nkp(A, Bshape):
             # Perform block decomposition
             blocks = map(lambda blockcol: tnp.split(blockcol*(1.0 + 0.0j), Bshape[0], 0),
-                                tnp.split(A.get()*(1.0 + 0.0j),        Bshape[1], 1))
+                                tnp.split(A.get()*(1.0 + 0.0j), Bshape[1], 1))
            # Default imposed decomposition
-           Atilde = tnp.vstack([block.ravel()*(1.0 + 0.0j) for blockcol in blocks
+            Atilde = tnp.vstack([block.ravel()*(1.0 + 0.0j) for blockcol in blocks
                                     for block in blockcol])
             # Perform decomposition
             U, s, V = tnp.linalg.svd(Atilde)
