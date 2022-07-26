@@ -283,9 +283,14 @@ class HamiltonionBackend:
         m = cm.ScalarMappable(norm=norm, cmap=cmap)
         for entry in results:
             xVal.append(entry[0][::-1])
-            yVal.append(entry[1].get()*100)
-        phases = [m.to_rgba(tnp.angle(results[j][2].get() * 1j)) for j in range(len(results))]
-
+            if(hasCupy):
+                yVal.append(entry[1].get()*100)
+            else:
+                yVal.append(entry[1]*100)
+        if(hasCupy):
+            phases = [m.to_rgba(tnp.angle(results[j][2].get() * 1j)) for j in range(len(results))]
+        else:
+            phases = [m.to_rgba(tnp.angle(results[j][2] * 1j)) for j in range(len(results))]
         df = pd.DataFrame(
             dict(
                 x=xVal,
