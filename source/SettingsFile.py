@@ -1,5 +1,6 @@
 # Settings class
 class Settings:
+    # Basically a structure of relevant simulation information
     backend = "HamiltionSimulation"
     num_qubits = 5
     num_width = 8

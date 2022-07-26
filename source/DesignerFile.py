@@ -17,6 +17,7 @@ import matplotlib as mpl
 
 
 class Designer:
+    # Store necessary field elements
     numSinceLastShown = 100
     gridHeight = -1
     gridWidth = -1
@@ -25,6 +26,9 @@ class Designer:
     settings = SettingsFile.Settings()
     result = None
     resultingHistgram = None
+
+    # Cursed as it is, this uses the Singleton design pattern to ensure duplicate gate objects are not create,
+    # instead one stores the positions and identifying string
     visible_gates = {'H': GateFile.GateFactory("Individual", 'H', np.array([[1/np.sqrt(2) + 0.0j, 1/np.sqrt(2) + 0.0j], [1/np.sqrt(2) + 0.0j, -1/np.sqrt(2) + 0.0j]]), [-1]),
                      '-': GateFile.GateFactory("Individual", '-', np.array([[1.0+0.0j, 0.0+0.0j], [0.0+0.0j, 1.0+0.0j]]), [-1]),
                      'CNOT': GateFile.GateFactory("Multiple", 'CNOT', np.array([[1 + 0.0j, 0 + 0.0j, 0 + 0.0j, 0 + 0.0j], [0 + 0.0j, 1 + 0.0j, 0 + 0.0j, 0 + 0.0j], [0 + 0.0j, 0 + 0.0j, 0 + 0.0j, 1 + 0.0j], [0 + 0.0j, 0 + 0.0j, 1 + 0.0j, 0 + 0.0j]]), [-2, -1]),
@@ -50,6 +54,7 @@ class Designer:
                      'PPC': GateFile.GateFactory("Individual", 'PPC', np.array([0]), [-1]),
                      'PPF': GateFile.GateFactory("Individual", 'PPF', np.array([0]), [-1])}
 
+    # initalize field elements based on input
     def __init__(self, newGridHeight=5, newGridWidth=8):
         self.gridHeight = newGridHeight
         self.gridWidth = newGridWidth
@@ -59,28 +64,35 @@ class Designer:
                 tempArray.append(self.visible_gates['-'])
             self.grid.append(tempArray)
 
+    # Getters for field information
     def giveGUIGrid(self, GUI):
         self.tempGrid = GUI
 
     def getGUIGrid(self):
         return self.tempGrid
 
+    # Takes given position on GUI grid and updates Designer's grid [ONLY deal with user-ediable portion]
     def gateAddition(self, name, posX, posY):
         if(name not in self.visible_gates):
             print("ERROR: Trying to add gate")
+        # Make a copy of grid
         self.grid[posX][posY] = copy.deepcopy(self.visible_gates[name])
+        # Change location
         self.grid[posX][posY].setPoint([posX, posY])
         tempQubits = []
+        # Get involved qubits
         qubits = self.grid[posX][posY].gate_qubitsInvolved
+        # Find the values of such qubits
         for i in range(len(qubits)):
             tempQubits.append(posY + i)
         self.grid[posX][posY].setInvolvedQubits(tempQubits)
         self.printDesign()
-        if(self.numSinceLastShown >= 10 and self.settings.gate_suggestion == True):
+        if(self.numSinceLastShown >= 10 and self.settings.gate_suggestion == True): # If gate suggestions are on
             self.numSinceLastShown = 0
-            self.suggestSimplifications()
+            self.suggestSimplifications() # Suggest suggestions if number of moves exceeds requirement
         self.numSinceLastShown += 1
 
+    # Replaces gate with empty gate
     def gateRemoval(self, posX, posY):
         self.grid[posX][posY] = self.visible_gates['-']
 
@@ -119,6 +131,7 @@ class Designer:
             print(tempStr)
         print(entry)
 
+    # Specify simulation settings, send grid information, run simulation, and get results
     def runSimulation(self):
         self.settings.shots = 256
         print(self.settings.specialGridSettings)
@@ -127,12 +140,15 @@ class Designer:
         self.result = simulation.get_results()
         self.resultingHistgram = simulation.get_visualization()
 
+    # Return back found result histogram
     def getVisualization(self):
         return self.resultingHistgram
 
+    # Allows one to set the backend being used
     def setBackend(self, name):
         self.settings.backend = name
 
+    # Saves field elements to file including GUI grid for state recovery
     def saveSimulationToFile(self, filename="quantumCircuitLatest.qc"):
         self.printDesign()
         fileFormat = {"results": self.result,
@@ -141,6 +157,7 @@ class Designer:
         with open(filename, 'wb') as fileSave:
             pickle.dump(fileFormat, fileSave)
 
+    # Load field elements from file and reconstruct matplotlib figure from data, simulation dependent
     def loadSimulationFromFile(self, filename="quantumCircuitLatest.qc"):
         with open(filename, 'rb') as fileSave:
             fileFormat = pickle.load(fileSave)
@@ -219,7 +236,8 @@ class Designer:
             self.gridWidth = fileFormat["gridWidth"]
             self.gridHeight = fileFormat["gridHeight"]
             self.tempGrid = fileFormat["GUIGrid"]
-    
+
+    # Various getters and setters
     def setObjective(self, string):
         self.settings.objectiveQUBOS = string
     
@@ -229,6 +247,7 @@ class Designer:
     def addConstraint(self, string):
         self.settings.constraintsQUBO.append(string)
 
+    # Run qiskit transpilation to get gate suggestions
     def suggestSimplifications(self, grid):
         starredPositions = {(-1,-1)}
         from qiskit import QuantumCircuit
@@ -256,12 +275,13 @@ class Designer:
         print(circuit)
         backend = Aer.get_backend('statevector_simulator')
         from qiskit import transpile
-        couplingMapping = []
+        couplingMapping = [] # Currently, only nearest-neighbor topology, so specify it (dependents on qubit number)
         for qubitIdx in range(self.gridHeight - 1):
             couplingMapping.append([qubitIdx, qubitIdx + 1])
+        # Save transpilation result
         simplified = transpile(circuit, backend=backend, coupling_map=couplingMapping, optimization_level=3)
         simplified.draw(output='mpl', filename='simplified.png') 
-
+        # Plot result
         import matplotlib.image as mpimg
         img = mpimg.imread('simplified.png')
         imgplot = plt.imshow(img)
