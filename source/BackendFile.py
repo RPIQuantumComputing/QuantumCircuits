@@ -4,11 +4,13 @@ import SettingsFile
 import math
 import matplotlib.pyplot as plt
 
+# Check to ensure cupy support or default to numpy
 hasCupy = True
 try:
     import cupy as np
 except:
     import numpy as np
+# Various Imports
 import numpy as tnp
 import random
 import matplotlib.cm as cm
@@ -38,6 +40,7 @@ class HamiltonionBackend:
         pass
     
     def sendRequest(self, gridWidth, gridHeight, grid):
+        # Extract underlying grid information
         circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
         for widthIdx in range(gridWidth):
             for heightIdx in range(gridHeight):
@@ -49,26 +52,33 @@ class HamiltonionBackend:
                         circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
         numQubits = gridHeight
         numDepth = gridWidth
+        # Store operations with associated matrix result
         operations = {'H': [np.array([[1/np.sqrt(2) + 0.0j, 1/np.sqrt(2) + 0.0j], [1/np.sqrt(2) + 0.0j, -1/np.sqrt(2) + 0.0j]]),1], '-': [np.array([[1, 0], [0,1]]),1],
              'CNOT': [np.array([[1+ 0.0j,0+ 0.0j,0+ 0.0j,0+ 0.0j],[0+ 0.0j,1+ 0.0j,0+ 0.0j,0+ 0.0j],[0+ 0.0j,0+ 0.0j,0+ 0.0j,1+ 0.0j],[0+ 0.0j,0+ 0.0j,1+ 0.0j,0+ 0.0j]]), 2], 'X': [np.array([[0 + 0.0j, 1+ 0.0j],[1+ 0.0j,0+ 0.0j]]),1], 'Y': [np.array([[0+ 0.0j, 0-1j],[0+1j, 0+ 0.0j]]), 1],
              'Z': [np.array([[1+ 0.0j, 0+ 0.0j],[0+ 0.0j,-1+ 0.0j]]), 1], 'S': [np.array([[1+ 0.0j,0+ 0.0j],[0+ 0.0j,0+1j]]), 1], 'T': [np.array([[1+ 0.0j,0+ 0.0j],[0+ 0.0j,0+tnp.exp(1j*np.pi/4)]]),1]}
-        
+
+        # Store current index of qubit, involved qubits for each index, and current state vector decomposition
         qubitToIndex = [j for j in range(numQubits)]
         qubitsInvolvedInIndex = [[j] for j in range(numQubits)]
         decomposedState = [np.transpose(np.array([1+ 0.0j,0 + 0.0j])) for i in range(numQubits)]
 
+        # Code from Matthew Johnson @ Google Brain to solve nearest kronacker product problem
+        # Find gram matrix decomposition
         def gram_matrix(Xs):
             temp = tnp.vstack([tnp.ravel(X) for X in Xs],dtype=complex)
             return tnp.dot(temp, temp.T)
 
+        # Return eigenvalues
         def eig(X):
             vals, vecs = np.linalg.eig(X)
             idx = tnp.argsort(tnp.abs(vals))
             return vals[idx], vecs[...,idx]
 
+        # Return eigenvalue for both transpose and nontranspose
         def eig_both(X):
             return eig(X.T)[1], eig(X)[1]
 
+        # Find the nearest product sum
         def nkp_sum(As, Bs):
             GK = tnp.dot(gram_matrix(As), gram_matrix(Bs))
             lvecs, rvecs = eig_both(GK)
@@ -77,17 +87,20 @@ class HamiltonionBackend:
             return Ahat.reshape(As[0].shape), Bhat.reshape(Bs[0].shape)
 
         def nkp(A, Bshape):
+            # Perform block decomposition
             blocks = map(lambda blockcol: tnp.split(blockcol*(1.0 + 0.0j), Bshape[0], 0),
-                                tnp.split(A.get()*(1.0 + 0.0j),        Bshape[1], 1))
+                                tnp.split(A.get()*(1.0 + 0.0j), Bshape[1], 1))
+           # Default imposed decomposition
             Atilde = tnp.vstack([block.ravel()*(1.0 + 0.0j) for blockcol in blocks
                                     for block in blockcol])
+            # Perform decomposition
             U, s, V = tnp.linalg.svd(Atilde)
             Cshape = A.shape[0] // Bshape[0], A.shape[1] // Bshape[1]
             idx = tnp.argmax(s)
             B = tnp.sqrt(s[idx]) * U[:,idx].reshape(Bshape).T
             C = tnp.sqrt(s[idx]) * V[idx,:].reshape(Cshape)
             return B, C
-
+        # Specific to this implementation, accounts for complex nearest kronacker product problem
         def performDecomp(matrixInput, matricies):
             if(np.shape(matrixInput)[0] < 4):
                 matricies.append(matrixInput)
@@ -99,16 +112,19 @@ class HamiltonionBackend:
             matricies.append(a)
             performDecomp(b, matricies)
             return
-        
+
+        # Gives the kronacker decomposition found
         def findDecomposition(matrix):
             matricies = []
             performDecomp(matrix, matricies)
             matricies = np.array(matricies)
             return matricies
 
+        # Allow for finding qubits involved in amtrix
         def findNumQubits(matrix):
             return matrix.shape()
 
+        # Gives tensor corresponding to specific depth
         def getTensor(depth):
             initalTensor = np.array([1])
             index = 0
@@ -118,9 +134,11 @@ class HamiltonionBackend:
                 index += 1
             return initalTensor
 
+        # Store probabilities, assume inital statevector of zero
         stateProbabilities = []
         initalState = np.zeros(numQubits)
         initalState[0] = 1
+        # Trick to get 2^n statevector from short string
         history = ["".join(seq) for seq in itertools.product("01", repeat=numQubits)]
         arrayHistory = [(np.fromstring(entry,'u1') - ord('0'))*(1.0+0.0j) for entry in history]
         for qubit in range(numQubits):
@@ -128,6 +146,7 @@ class HamiltonionBackend:
         for possiblePrior in arrayHistory:
             pass
 
+        # For circuit depth and qubit amount
         for depthCurrent in range(numDepth):
             for qubit in range(numQubits):
                 numActors = operations[circuitOperators[depthCurrent][qubit][0]][1]
@@ -135,27 +154,21 @@ class HamiltonionBackend:
                 if(circuitOperators[depthCurrent][qubit][0] != '-'):
                     indexToCombined = min(circuitOperators[depthCurrent][qubit][1])
                     if(2**numActors == np.shape(decomposedState[qubitToIndex[qubit]])[0]):
+                        # Single gate, easy peasy lemon squezze, just get matrix and dot it
                         matrix = operations[circuitOperators[depthCurrent][qubit][0]][0]
-                        #print("-----------------------1st-----------------------------------")
-                        #print("Operation: ", circuitOperators[depthCurrent][qubit][0])
-                        #print("Matrix: ", matrix)
-                        #print("State: ", decomposedState[qubitToIndex[indexToCombined]], " of qubit: ", qubit)
                         decomposedState[qubitToIndex[qubit]] = matrix.dot(decomposedState[qubitToIndex[qubit]])
-                        #print("Result: ", decomposedState[qubitToIndex[qubit]])
                     else:
-                        #print("-----------------------2nd-----------------------------------")
-                        #print("Depth: ", depthCurrent, " Qubit: ", qubit)
-                        #print("Operation: ", circuitOperators[depthCurrent][qubit][0])
-                        #print("Matrix To Apply: ", matrix)
-                        #print("Involved Actors: ", circuitOperators[depthCurrent][qubit][1])
-                    #for actor in circuitOperators[depthCurrent][qubit][1]:
+                        # Find current state vector, get effective application matrix
                         tempStateVec = np.array([1])
                         applyMatrix = np.array([1])
                         tempAppliedMembers = 0
                         newQubitsInvolved = []
+                        # For qubits involved in interaction
                         for actorQubit in circuitOperators[depthCurrent][qubit][1]:
+                            # Kronacker relevant state vectors
                             tempStateVec = np.kron(tempStateVec, decomposedState[qubitToIndex[actorQubit]])
                             for entry in qubitsInvolvedInIndex[qubitToIndex[actorQubit]]:
+                                # Append the qubits involved, create entangled state
                                 newQubitsInvolved.append(entry)
                                 qubitToIndex[entry] = qubitToIndex[qubit]
                                 qubitsInvolvedInIndex[entry] = [-1]
@@ -166,9 +179,10 @@ class HamiltonionBackend:
                                     if(tempAppliedMembers != numActors):
                                         applyMatrix = np.kron(applyMatrix, matrix)
                                         tempAppliedMembers += numActors
+                        # Apply effective matrix
                         qubitsInvolvedInIndex[qubitToIndex[qubit]] = newQubitsInvolved
                         decomposedState[qubitToIndex[qubit]] = applyMatrix.dot(tempStateVec)
-
+        # Resolves empty positions and indexing errors
         temp = []
         for entry in decomposedState:
             if(np.shape(entry)[0] > 0):
@@ -187,11 +201,12 @@ class HamiltonionBackend:
         qubitsInvolvedInIndex = temp
         temp = []
 
+        # Short code to help replace string position
         def replace(string, index, newString):
             s = string[:index] + newString + string[index + 1:]
             return s
 
-
+        # Gets weighted probability based on statevector
         def getWeightedProbabilities(saveResults):
             initalString = "0"*numQubits
             shotNum = 2**10
@@ -199,23 +214,29 @@ class HamiltonionBackend:
             results = {}
             resultsPhases = {}
             currentShot = 0
-            while(currentShot < shotNum):
+            while(currentShot < shotNum): # For number of samples
                 for decision in range(len(decomposedState)):
-                    numVal = len(decomposedState[decision])
-                currentArray = decomposedState[decision].get()
+                    numVal = len(decomposedState[decision]) # Add decision
+                if(hasCupy):
+                    currentArray = decomposedState[decision].get() # Get probabilities
+                else:
+                    currentArray = decomposedState[decision]
                 probabilities = tnp.zeros((numVal,))
                 for index in range(numVal):
                     dotWith = tnp.zeros((numVal,))
                     dotWith[index] = 1.0
                     dotWith = tnp.dot(dotWith, currentArray[index])
-                    probabilities[index] = tnp.real(tnp.conj(dotWith).dot(dotWith))
+                    probabilities[index] = tnp.real(tnp.conj(dotWith).dot(dotWith)) # Perform normalization on statevector
                 probabilities = [element/tnp.sum(probabilities) for element in probabilities]
+                # Get binary representation and choose values for state decomposition
                 pickedPossibility = tnp.random.choice(len(currentArray), p=probabilities)
                 s = bin(pickedPossibility)
                 stringToParse = "0"*(len(qubitsInvolvedInIndex[decision]) - len(s[2:])) + s[2:]
+                # Add to phase
                 phase += decomposedState[decision][pickedPossibility]
                 index = 0
                 for char in stringToParse:
+                    # Store choice to string
                     if(index < len(qubitsInvolvedInIndex[decision])):
                         truePosition = qubitsInvolvedInIndex[decision][index]
                         initalString = initalString[:truePosition] + char + initalString[truePosition + 1:]
@@ -230,9 +251,11 @@ class HamiltonionBackend:
                 initalString = "0"*numQubits
                 phase = 0
                 currentShot += 1
+                # Save results and add to current shot
                 for element in results.keys():
                     saveResults.append([element, results[element]/shotNum, resultsPhases[element]])
 
+        # Does same thing, but just gets all probabilities
         def getAllPossibilities(result):
             a = []
             probabilitiesList = []
@@ -251,7 +274,7 @@ class HamiltonionBackend:
                     if(probabilities[j] > 0):
                         temp.append(j)
                 a.append(temp)
-            combinations = list(itertools.product(*a))
+            combinations = list(itertools.product(*a)) # Very underrated line to get all possible combination of array choices
             for decisionSet in combinations:
                 decisionNum = 0
                 phase = 0
@@ -272,7 +295,8 @@ class HamiltonionBackend:
                             break
                     decisionNum += 1
                 results.append([initalString, probability, phase])
-            
+
+        # Get results, store figure, normalize, apply phase scalar map
         results = []
         getAllPossibilities(results)
         fig = plt.figure(figsize = (20, 5))
@@ -281,11 +305,18 @@ class HamiltonionBackend:
         norm = mpl.colors.Normalize(vmin=0, vmax=np.pi)
         cmap = cm.hsv
         m = cm.ScalarMappable(norm=norm, cmap=cmap)
+        # Normalize to 100% (show percentages, not decimals)
         for entry in results:
             xVal.append(entry[0][::-1])
-            yVal.append(entry[1].get()*100)
-        phases = [m.to_rgba(tnp.angle(results[j][2].get() * 1j)) for j in range(len(results))]
-
+            if(hasCupy):
+                yVal.append(entry[1].get()*100)
+            else:
+                yVal.append(entry[1]*100)
+        if(hasCupy):
+            phases = [m.to_rgba(tnp.angle(results[j][2].get() * 1j)) for j in range(len(results))]
+        else:
+            phases = [m.to_rgba(tnp.angle(results[j][2] * 1j)) for j in range(len(results))]
+        # Values are not sorted, do your magic pandas!
         df = pd.DataFrame(
             dict(
                 x=xVal,
@@ -295,9 +326,11 @@ class HamiltonionBackend:
         )
 
         df_sorted = df.sort_values('x')
+        # Make graph
         plt.bar(df_sorted['x'], df_sorted['y'], width = 0.4, color = df_sorted['phase'])
         plt.xlabel("Computational Result")
         plt.ylabel("Probability")
+        # Empirical formula to find rotations
         rotationAmount = math.floor(90/(1 + np.exp(-(((len(xVal))/3)-5))))
         plt.xticks(rotation = rotationAmount)
         cbar = plt.colorbar(m)
@@ -319,6 +352,7 @@ class FeynmanBackend:
         pass
     
     def sendRequest(self, gridWidth, gridHeight, grid):
+        # Do similar decomposition process
         circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
         for widthIdx in range(gridWidth):
             for heightIdx in range(gridHeight):
@@ -330,6 +364,7 @@ class FeynmanBackend:
                         circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
         numQubits = gridHeight
         numDepth = gridWidth
+        # Make qiskit gate
         circuit = QuantumCircuit(numQubits)
         for widthIdx in range(gridWidth):
             circuitLayer = []
@@ -351,12 +386,14 @@ class FeynmanBackend:
                         circuit.cnot(heightIdx, heightIdx + 1)
                         heightIdx += 1
         circuit.measure_all()
+        # Save results
         simulator = Aer.get_backend('aer_simulator_density_matrix')
         self.results = simulator.run(circuit).result().get_counts(circuit)
         fig = plt.figure(figsize = (20, 5))
         xVal = []
         yVal = []
         total = 0
+        # Turn into histogram format
         for _, y in self.results.items():
             total += y
         for a, b in self.results.items():
@@ -369,7 +406,7 @@ class FeynmanBackend:
                 y=yVal
             )
         )
-
+        # Same plotting as before
         df_sorted = df.sort_values('x')
         plt.bar(df_sorted['x'], df_sorted['y'], width = 0.4)
         plt.xlabel("Computational Result")
@@ -398,27 +435,33 @@ class DWaveBackend:
         import dimod
         from dimod import Binary, Integer
         import dwave.inspector
-
+        # Initalize a constraint quadratic model
         cqm = dimod.CQM()
         stop = False
+        # Execute variable declarations
         for entry in self.settings.variableDeclarationsQUBO:
         	if(len(entry) > 1):
         		exec(entry)
+        # Extract objective function
         objectiveFunction = self.settings.objectiveQUBOS
         print(self.settings.objectiveQUBOS)
+        # Set objective
         if("max" in objectiveFunction):
             eval("cqm.set_objective(" + "-1*(" + objectiveFunction[4:] + ")" + ")")
         else:
             eval("cqm.set_objective(" + objectiveFunction[4:] + ")")
+        # Add constraints
         stop = False
         for entry in self.settings.constraintsQUBO:
         	if(len(entry) > 1):
         		eval("cqm.add_constraint(" + entry + ")")
+        # Use token to sample solutions and filter out infeasible ones
         from dwave.system import LeapHybridCQMSampler
         sampler = LeapHybridCQMSampler(token=self.API_Token)     
         sampleset = sampler.sample_cqm(cqm, label='QuboParsing')
         sampleset = sampleset.filter(lambda row: row.is_feasible)
         self.results = sampleset
+        # Get resulting energies and save result
         valuesFound = []
         for energy, in sampleset.data(fields=['energy']):
             valuesFound.append(energy)
@@ -442,6 +485,7 @@ class XanaduBackend:
         self.API_KEY = api_string
     
     def sendRequest(self, gridWidth, gridHeight, grid):
+        # Similar decomposition, expanded to support photonic multi-gate
         circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
         for widthIdx in range(gridWidth):
             for heightIdx in range(gridHeight):
@@ -454,12 +498,15 @@ class XanaduBackend:
         numQubits = gridHeight
         import strawberryfields as sf
         from strawberryfields import ops
-        
+
+        # Assume fock measurement
         measurementType = ["F" for i in range(numQubits)]
+        # Initalize program
         circuit = sf.Program(numQubits)
         with circuit.context as q:
             for widthIdx in range(gridWidth):
                 for heightIdx in range(gridHeight):
+                    # Load up gates
                     if(grid[widthIdx][heightIdx].getName() != '-'):
                         if(grid[widthIdx][heightIdx].getName() == "PD"):
                             ops.Dgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0], self.settings.specialGridSettings[(widthIdx, heightIdx)][1]) | q[widthIdx]
@@ -478,7 +525,7 @@ class XanaduBackend:
                         if(grid[widthIdx][heightIdx].getName() == "PF"):
                             ops.Fouriergate() | q[widthIdx]
                         if(grid[widthIdx][heightIdx].getName() == "PPV"):
-                            ops.Vaccum() | q[widthIdx]
+                            ops.Vacuum() | q[widthIdx]
                         if(grid[widthIdx][heightIdx].getName() == "PPC"):
                             ops.Coherent(self.settings.specialGridSettings[(widthIdx, heightIdx)][0], self.settings.specialGridSettings[(widthIdx, heightIdx)][1]) | q[widthIdx]
                         if(grid[widthIdx][heightIdx].getName() == "PPF"):
@@ -501,18 +548,22 @@ class XanaduBackend:
                         if(grid[widthIdx][heightIdx].getName() == "PCK"):
                             ops.CKgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | (q[widthIdx], q[widthIdx + 1])
                             heightIdx += 1
-            ops.MeasureFock() | q
+            ops.MeasureFock() | q # Assume fock measurement technique
 
+        # Save API token, ping for request
         import xcc
         from strawberryfields import RemoteEngine
         xcc.Settings(REFRESH_TOKEN=self.API_KEY).save()
         import xcc.commands
         xcc.commands.ping()
 
+        # Get remote results with Guassian Technique backend
         eng = RemoteEngine("simulon_gaussian")
         results = eng.run(circuit, shots=100)
-
+        print("Got Results")
+        print(results)
         result = {}
+        # Add results and get fock measurement (modal results)
         for entry in results.samples:
             s = ""
             for item in entry:
@@ -521,10 +572,13 @@ class XanaduBackend:
                 result[s[:len(s)-1]] = 1
             else:
                 result[s[:len(s)-1]] += 1
+        print("Saved values...")
+        # Save relevant infromation
         fig = plt.figure(figsize = (20, 5))
         plt.bar(result.keys(), result.values(), 1, color='b')
         plt.xlabel("Fock Measurement State (binary representation for 'qubit' analysis")
         plt.ylabel("Occurences")
+        print("Saving Values...")
         self.histogramResult = plt
         self.results = result
 
@@ -543,6 +597,7 @@ class QiskitBackend:
         self.API_KEY = api_string
     
     def sendRequest(self, gridWidth, gridHeight, grid):
+        # Same as before in Feynman
         circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
         for widthIdx in range(gridWidth):
             for heightIdx in range(gridHeight):
@@ -575,6 +630,7 @@ class QiskitBackend:
                         circuit.cnot(heightIdx, heightIdx + 1)
                         heightIdx += 1
         circuit.measure_all()
+        # This time, use the QaSM provider
         from qiskit import IBMQ
         from qiskit.compiler import transpile, assemble
         IBMQ.save_account(self.API_KEY, overwrite=True)
@@ -583,7 +639,8 @@ class QiskitBackend:
         transpiled = transpile(circuit, backend=backend)
         qobj = assemble(transpiled, backend=backend, shots=1024)
         job = backend.run(qobj)
-        print(job.status())
+        print(job.status()) # Tell the user results are pending
+        # Produce results
         self.results = job.result().get_counts(circuit)
         fig = plt.figure(figsize = (20, 5))
         xVal = []
@@ -612,6 +669,7 @@ class QiskitBackend:
         self.histogramResult = plt
         print(self.results)
 
+# Backend factor to create gates
 def BackendFactory(backendType="HamiltionSimulation", settings=SettingsFile.Settings()):
     backendTypes = {
         "HamiltionSimulation" : HamiltonionBackend,

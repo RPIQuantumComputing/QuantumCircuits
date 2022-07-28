@@ -10,27 +10,53 @@ from matplotlib.figure import Figure
 from PIL import Image
 from threading import *
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from PyQt5 import QtCore, QtGui, QtWidgets
+import DesignerFile
 
+# Default X ignore
 ignoreX = 4
+
+# Load up all graphic images, Singleton design pattern
 gateToImage = {" ": Image.open("../assets/EMPTY.png"), "-": Image.open("../assets/GATE.png"), "H": Image.open("../assets/H.png"), 
                 "T": Image.open("../assets/T.png"), "S": Image.open("../assets/S.png"), "X": Image.open("../assets/X.png"), "Y": Image.open("../assets/Y.png"),
-                "Z": Image.open("../assets/Z.png"), "CNOT": Image.open("../assets/CNOT.png")}
+                "Z": Image.open("../assets/Z.png"), "CNOT": Image.open("../assets/CNOT.png"),
+               "PBS": Image.open("../assets/PBS.png"), "PCK": Image.open("../assets/PCK.png"), "PCX": Image.open("../assets/PCX.png"),
+               "PCZ": Image.open("../assets/PCZ.png"), "PD": Image.open("../assets/PD.png"), "PF": Image.open("../assets/PF.png"),
+               "PMZ": Image.open("../assets/PMZ.png"), "PPC": Image.open("../assets/PPC.png"), "PPF": Image.open("../assets/PPF.png"),
+               "PPV": Image.open("../assets/PPV.png"), "PS": Image.open("../assets/PS.png"), "PS2": Image.open("../assets/PS2.png"),
+               "PV": Image.open("../assets/PV.png"), "PX": Image.open("../assets/PX.png"), "PZ": Image.open("../assets/PZ.png")}
+
+# Same grid information, offSetHorizontal offsets to the play field (where user puts gates)
+# from the gate storage and barrier positions
 currentWidth = 8
-currentHeight = 5
+currentHeight = 6
 offSetHorizontal = 3
-grid = [["-" for i in range(currentWidth + 3)] for j in range(currentHeight)]
 
+# Default to the "-" gate, store previous position of barrier
+grid = [["-" for i in range(currentWidth + offSetHorizontal)] for j in range(currentHeight)]
+priorBarrier = [-1,-1,-1,-1]
+
+# Initalize Designer
+designer = DesignerFile.Designer(currentHeight, currentWidth)
+
+# Various graphics settings
 hamiltonian = False
-import DesignerFile
-designer = DesignerFile.Designer()
-
 needToUpdate = False
 photonicMode = False
 
+# Specific global state for DWave Annealer
 DWaveVar = ""
 DWaveCon = ""
 DwaveObjective = ""
 
+# For field elements that complete change layout
+def forceUpdate():
+    global window
+    window.close()
+    window = Window()
+    window.show()
+
+# Cursed as it is, this is a lookup table to store the inital gate positions
 def inital(row, col):
     if(photonicMode == False):
         if(row == 0 and col == 0):
@@ -48,13 +74,41 @@ def inital(row, col):
         if(row == 3 and col == 0):
             return "CNOT"
     else:
-        # Kandan, add all the new gates here to the GUI
-        pass
+        if(row == 0 and col == 0):
+            return "PX"
+        if(row == 0 and col == 1):
+            return "PZ"
+        if(row == 0 and col == 2):
+            return "PX"
+        if(row == 0 and col == 3):
+            return "PS"
+        if(row == 1 and col == 0):
+            return "PS2"
+        if(row == 1 and col == 1):
+            return "PMZ"
+        if(row == 1 and col == 2):
+            return "PCX"
+        if(row == 1 and col == 3):
+            return "PD"
+        if(row == 2 and col == 0):
+            return "PF"
+        if(row == 2 and col == 1):
+            return "PBS"
+        if(row == 2 and col == 2):
+            return "PCK"
+        if(row == 2 and col == 3):
+            return "PPC"
+        if(row == 3 and col == 0):
+            return "PPF"
+        if(row == 3 and col == 1):
+            return "PPV"
     return " "
 
 
+# This runs the simulation
 def runSimulation():
     print("---------------------Running Simulation-------------------------------------")
+    # PENDING upon which BACKEND is selected, the control flow is different [might need other GUI settings]
     #run simulation with Dwave ocean
     if (designer.settings.backend == "DWaveSimulation"):
         print("User Variables added: \n")
@@ -86,9 +140,8 @@ def runSimulation():
         designer.runSimulation()
         plt = designer.getVisualization()
         plt.show()
-
-    #other simulation technique
     else:
+        # If not qubo optimization, it is a circuit problem, so display it
         print("Quantum Circuit Printout: ")
         print(grid)
         numDepth = currentWidth
@@ -101,11 +154,11 @@ def runSimulation():
         for qubit in range(numQubits):
             tempStr = ""
             nextOne = False
-            for depth in range(3, numDepth):
+            for depth in range(offSetHorizontal, numDepth):
                 if((qubit, depth) in starredPositions):
                     tempStr += "[*]"
                 else:
-                    designer.gateAddition(grid[qubit][depth], depth-3, qubit)
+                    designer.gateAddition(grid[qubit][depth], depth-offSetHorizontal, qubit)
                     tempStr += "[" + grid[qubit][depth] + "]"
                 if(len(grid[qubit][depth]) >= 3 and "PP" not in grid[qubit][depth]):
                     starredPositions.add((qubit + 1, depth))
@@ -113,8 +166,11 @@ def runSimulation():
             print(tempStr)
         print(entry)
         print("------------------------BACKEND GOT-------------------------------------")
+        # Have the designer confirm the board (for debugging)
         designer.printDesign()
+        # Run the simulation
         designer.runSimulation()
+        # Get the output
         plt = designer.getVisualization()
         plt.show()
 
@@ -134,7 +190,11 @@ def changeSimulationTechniqueIBM():
 def changeSimulationTechniqueQiskit():
     designer.setBackend("Qiskit")
     print("Changed to Qiskit Backend")
+def changeSimulationTechniqueXanadu():
+    designer.setBackend("Photonic")
+    print("Changed to Xanadu Photonic Backend")
 
+# Change Various settings based on click events, self-explanatory
 def changeMeasurement(checked):
     designer.settings.measurement = checked
     print("Set measurement to " + str(checked))
@@ -152,12 +212,14 @@ def updateNumQubit(val):
     designer.settings.num_qubits = val
     print("Set number of qubits to " + str(val))
 
+# This is a less forceful update that changes whenever the GUI is interacted with
 def updateGrid():
     global grid
     global needToUpdate
     grid = designer.getGUIGrid()
     needToUpdate = True    
 
+# Changes Width of Quantum Circuit
 def updateNumWidth(val):
     designer.settings.num_width = val
     print("Set width to " + str(val))
@@ -280,6 +342,10 @@ class Window(QMainWindow):
             if self.external_sim_msg.msg_toggle:
                 self.external_sim_msg.exec()
             changeSimulationTechniqueQiskit()
+        elif("X" in self.sim_box.currentText()):
+            if self.external_sim_msg.msg_toggle:
+                self.external_sim_msg.exec()
+            changeSimulationTechniqueXanadu()
         else:
             if self.external_sim_msg.msg_toggle:
                 self.external_sim_msg.exec()
@@ -325,6 +391,7 @@ class Window(QMainWindow):
         layout.addWidget(photonicMode)
         photonicMode.callsign = "photonic"
 
+        # Various other field boxes, obvious based on titling
         noice_label = QLabel("Noice Model")
         noice_selection = ["none", "other..."]
         noice_box = QComboBox()
@@ -363,8 +430,9 @@ class Window(QMainWindow):
         self.external_sim_msg.msg_toggle = True;
         self.external_sim_msg.buttonClicked.connect(self.externalMsgToggle)
 
+        # Simulation selection panel
         Simulation = QLabel("Simulation Technique")
-        sim_selection = ["Hamiltionian", "Feynman", "DWave Ocean", "Qiskit", "IBM Xanadu"]
+        sim_selection = ["Hamiltionian", "Feynman", "DWave Ocean", "Qiskit", "IBM", "Xanadu"]
         self.sim_box = QComboBox()
         self.sim_box.addItems(sim_selection)
         self.sim_box.currentIndexChanged.connect(self.updateSimulationTechnique)
@@ -396,19 +464,30 @@ class Window(QMainWindow):
         elif (Button.callsign == "incresim"):
             changeIncresim(Button.isChecked())
         elif (Button.callsign == "photonic"):
+            # Photonic Switch requires a forced update (different width and gate sets)
             print("Update to Photonic Mode...")
             global photonicMode
+            global offSetHorizontal
+            global grid
+            global currentWidth
+            global currentHeight
             photonicMode = not photonicMode
-            global needToUpdate 
-            needToUpdate = True
+            offSetHorizontal = 5
+            grid = [["-" for i in range(currentWidth + offSetHorizontal)] for j in range(currentHeight)]
+            global needToUpdate
+            needToUpdate = False
+            forceUpdate()
 
+    # Updates parameters locally and calls for forced change
     def UpdateParameters(self):
         spin = self.sender()
         val = spin.value()
         if (spin.callsign == "numqubit"):
             updateNumQubit(val)
+            forceUpdate()
         elif (spin.callsign == "numwidth"):
             updateNumWidth(val)
+            forceUpdate()
 
     #let Dwave input tab show when user clicks on toolbar
     def showDWaveTab(self):
@@ -433,7 +512,7 @@ class DWaveTab(QDialog):
         self.tabs.addTab(self.tab_addcon, "Add Constraints")
         self.tabs.addTab(self.tab_addobj, "Set Objective")
 
-        #add to layout
+        # Various grid elements necessary for extracting necessary information for optimization problem
         self.tab_addvar.layout = QVBoxLayout(self)
         self.dwave_var = QTextEdit()
         self.dwave_var.setPlaceholderText("Add your variable here. (i.e. 'a = Binary(\"a\")')\n")
@@ -481,9 +560,9 @@ class IndicSelectWindow(QDialog):
         self.scrollArea.setWidget(self.scrollAreaWidgetContents)
         self.layout.addWidget(self.scrollArea)
 
-
-        skipThis = [-1, -1]
-        for j in range(1, 4):
+        # Go through the grid and initalize values
+        skipThis = [-1, -1] # For multiqubit gates, skip initalizing covered positions
+        for j in range(1, offSetHorizontal + 1):
             for i in range(currentHeight):
                 if(skipThis[0] == i and skipThis[1] == j):
                     grid[i][j - 1] = " "
@@ -498,14 +577,16 @@ class IndicSelectWindow(QDialog):
                 self.figure = Figure()  # a figure to plot on
                 self.canvas = FigureCanvas(self.figure)
                 self.ax = self.figure.add_subplot(111)  # create an axis
-                if(j == 3):
+                if(j == offSetHorizontal):  # If we need to create the barrier
                     self.Frame.setStyleSheet("background-color: grey;")
                     Box = QVBoxLayout()
                     Box.addWidget(self.Frame)
-                    self.gridLayout.addLayout(Box, i, j - 1, 3, 1)
-                else:
-                    grid[i][j - 1] = inital(i, j - 1)
-                    self.ax.imshow(gateToImage[grid[i][j - 1]])
+                    self.gridLayout.addLayout(Box, i, j-1, len(grid)-2, 1)
+                    global priorBarrier
+                    priorBarrier = [i, j - 1, len(grid)-2, 1]
+                else: # If we are adding just a gate
+                    grid[i][j - 1] = inital(i, j - 1) # Find what gate if any should go in position
+                    self.ax.imshow(gateToImage[grid[i][j - 1]]) # Show the gate
                     self.ax.set_axis_off()
                     self.canvas.draw()  # refresh canvas
                     self.layout.addWidget(self.canvas)
@@ -513,7 +594,8 @@ class IndicSelectWindow(QDialog):
                     Box = QVBoxLayout()
                     Box.addWidget(self.Frame)
                     self.gridLayout.addLayout(Box, i, j - 1)
-        for i in range(3, currentWidth + 3):
+        # Go through and initalize field user interacts with
+        for i in range(offSetHorizontal, currentWidth + offSetHorizontal):
             for j in range(currentHeight):
                 grid[j][i] = "-"
                 self.Frame = QFrame(self)
@@ -537,6 +619,7 @@ class IndicSelectWindow(QDialog):
 
                 self.gridLayout.addLayout(Box, j, i)
 
+    # Run fo the mill event filter
     def eventFilter(self, watched, event):
         if event.type() == QEvent.MouseButtonPress:
             self.mousePressEvent(event)
@@ -546,11 +629,13 @@ class IndicSelectWindow(QDialog):
             self.mouseReleaseEvent(event)
         return super().eventFilter(watched, event)
 
+    # Allow easy access to grid index from gridLayout position
     def get_index(self, pos):
         for i in range(self.gridLayout.count()):
             if self.gridLayout.itemAt(i).geometry().contains(pos) and i != self.target:
                 return i
 
+    # Load up source information if user clicks a gate
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             self.target = self.get_index(event.windowPos().toPoint())
@@ -578,7 +663,7 @@ class IndicSelectWindow(QDialog):
             self.gridLayout.addLayout(Box, 0, 6)
             self.gridLayout.setColumnStretch(6, 1)
             self.gridLayout.setRowStretch(0, 1)
-
+    # If moving the mouse, bring the element with you
     def mouseMoveEvent(self, event):
         if event.buttons() & Qt.LeftButton and self.target is not None:
             drag = QDrag(self.gridLayout.itemAt(self.target))
@@ -591,11 +676,12 @@ class IndicSelectWindow(QDialog):
             drag.exec_()
         global needToUpdate
         global grid
+        # If we need to update the grid, update all positions to have GUI be consistent with Grid 2D array
         if needToUpdate:
             print("Updating....")
             needToUpdate = False
             skipThis = [-1, -1]
-            for i in range(3, currentWidth + 3):
+            for i in range(offSetHorizontal, currentWidth + offSetHorizontal):
                 for j in range(currentHeight):
                     self.Frame = QFrame(self)
                     self.Frame.setStyleSheet("background-color: white;")
@@ -618,31 +704,42 @@ class IndicSelectWindow(QDialog):
                     self.gridLayout.removeItem(self.gridLayout.itemAtPosition(j, i))
                     self.gridLayout.addLayout(Box, j, i)
 
-
+    # If releasing, event on drag and drop occured, so neglect this gate
     def mouseReleaseEvent(self, event):
         self.target = None
 
+    # Only allow gates to be draggable elements
     def dragEnterEvent(self, event):
         if event.mimeData().hasImage():
             event.accept()
         else:
             event.ignore()
 
+    # Handle drop logic
     def dropEvent(self, event):
         if not event.source().geometry().contains(event.pos()):
             source = self.get_index(event.pos())
             if source is None:
                 return
-
+            # Get source and destination points
             i, j = max(self.target, source), min(self.target, source)
             row, col, _, _ = self.gridLayout.getItemPosition(self.target)
             row2, col2, _, _ = self.gridLayout.getItemPosition(source)
+            # If it is a photonic gate, get necessary values for gate specification
+            global photonicMode
+            if (photonicMode == True):
+                val1, val2 = 0.0, 0.0
+                val1 = QtWidgets.QInputDialog.getDouble(self, 'First Gate Argument', 'Input:')[0]
+                val2 = QtWidgets.QInputDialog.getDouble(self, 'Second Gate Argument', 'Input:')[0]
+                global designer
+                global offSetHorizontal
+                # Specify the gate properties
+                designer.settings.specialGridSettings[(col2-offSetHorizontal,row2)] = [val1, val2]
+                print(designer.settings.specialGridSettings)
+
             p1, p2 = self.gridLayout.getItemPosition(self.target), self.gridLayout.getItemPosition(source)
-            #self.gridLayout.addItem(self.gridLayout.takeAt(i), *p2)
-            #self.gridLayout.addItem(self.gridLayout.takeAt(j), *p1)
-            #self.gridLayout.takeAt(self.target)
-            #self.gridLayout.takeAt(source)
-            if(self.gridLayout.getItemPosition(self.target)[1] < 3):
+            # If we are moving a point on the user board, replace positions
+            if(self.gridLayout.getItemPosition(self.target)[1] < offSetHorizontal):
                 self.Frame = QFrame(self)
                 self.Frame.setStyleSheet("background-color: white;")
                 self.Frame.setLineWidth(0)
@@ -660,11 +757,11 @@ class IndicSelectWindow(QDialog):
                 self.gridLayout.takeAt(source)
                 self.gridLayout.addLayout(Box, row2, col2)
                 grid[row2][col2] = grid[row][col]
-            else:
+            else: # Else, ONLY move the gate in the user board
                 self.gridLayout.addItem(self.gridLayout.takeAt(self.target), *p2)
                 self.gridLayout.addItem(self.gridLayout.takeAt(source), *p1)
                 grid[row][col], grid[row2][col2] = grid[row2][col2], grid[row][col]
-
+            # Print out the grid (for debugging purposes)
             print("Quantum Circuit Printout:")
             print(grid)
             numDepth = currentWidth
@@ -677,7 +774,7 @@ class IndicSelectWindow(QDialog):
             for qubit in range(numQubits):
                 tempStr = ""
                 nextOne = False
-                for depth in range(3, numDepth):
+                for depth in range(offSetHorizontal, numDepth + offSetHorizontal):
                     if((qubit, depth) in starredPositions):
                         tempStr += "[*]"
                     else:
@@ -690,23 +787,70 @@ class IndicSelectWindow(QDialog):
 
     #update layout basesd on designer class' grid
     def updateGUILayout(self):
-        for i in range(currentWidth): #height
-            for j in range(currentHeight): #width
+        global priorBarrier
+        global offSetHorizontal
+        global grid
+        global currentHeight
+        global currentWidth
+        # Basically a repeat from GUI initalization, see those comments for explainations
+        skipThis = [-1, -1]
+        for j in range(1, offSetHorizontal + 1):
+            for i in range(currentHeight):
+                if(skipThis[0] == i and skipThis[1] == j):
+                    grid[i][j - 1] = " "
+                    break
+                grid[i][j-1] = " "
+                self.Frame = QFrame(self)
+                self.Frame.setStyleSheet("background-color: white;")
+                self.Frame.setFrameStyle(QFrame.Panel | QFrame.Raised)
+                self.Frame.setLineWidth(0)
+                self.layout = QHBoxLayout(self.Frame)
+
                 self.figure = Figure()  # a figure to plot on
                 self.canvas = FigureCanvas(self.figure)
                 self.ax = self.figure.add_subplot(111)  # create an axis
-                self.ax.imshow(gateToImage[grid[j][i]])
+                if(j == offSetHorizontal):
+                    self.Frame.setStyleSheet("background-color: grey;")
+                    Box = QVBoxLayout()
+                    Box.addWidget(self.Frame)
+                    self.gridLayout.addLayout(Box, i, j-1, len(grid)-2, 1)
+                    priorBarrier = [i, j-1, len(grid)-2, 1]
+                else:
+                    grid[i][j - 1] = inital(i, j - 1)
+                    self.ax.imshow(gateToImage[grid[i][j - 1]])
+                    self.ax.set_axis_off()
+                    self.canvas.draw()  # refresh canvas
+                    self.layout.addWidget(self.canvas)
+                    self.canvas.installEventFilter(self)
+                    Box = QVBoxLayout()
+                    Box.addWidget(self.Frame)
+                    self.gridLayout.addLayout(Box, i, j - 1)
+        for i in range(offSetHorizontal, currentWidth + offSetHorizontal):
+            for j in range(currentHeight):
+                grid[j][i] = "-"
+                self.Frame = QFrame(self)
+                self.Frame.setStyleSheet("background-color: white;")
+                self.Frame.setLineWidth(0)
+                self.layout = QHBoxLayout(self.Frame)
+
+                self.figure = Figure()  # a figure to plot on
+                self.canvas = FigureCanvas(self.figure)
+                self.ax = self.figure.add_subplot(111)  # create an axis
+                self.ax.imshow(gateToImage["-"])
                 self.ax.set_axis_off()
                 self.canvas.draw()  # refresh canvas
                 self.canvas.installEventFilter(self)
+
                 self.layout.addWidget(self.canvas)
+
                 Box = QVBoxLayout()
+
                 Box.addWidget(self.Frame)
-                self.gridLayout.addLayout(Box, i, j)
 
+                self.gridLayout.addLayout(Box, j, i)
 
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    window = Window()
-    window.show()
-    sys.exit(app.exec_()) 
+# Create the application, window, and close application if asked
+app = QApplication(sys.argv)
+window = Window()
+window.show()
+sys.exit(app.exec_())
