@@ -12,6 +12,11 @@ from threading import *
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from PyQt5 import QtCore, QtGui, QtWidgets
 import DesignerFile
+from redmail import EmailSender
+from redmail import outlook
+
+from pathlib import Path
+import pandas as pd
 
 # Default X ignore
 ignoreX = 4
@@ -55,6 +60,13 @@ def forceUpdate():
     window.close()
     window = Window()
     window.show()
+
+gmail = EmailSender(
+    host='smtp.office365.com',
+    port=587,
+    username="quantumcircuits@outlook.com",
+    password="dylansheils0241"
+)
 
 # Cursed as it is, this is a lookup table to store the inital gate positions
 def inital(row, col):
@@ -260,14 +272,15 @@ class Window(QMainWindow):
         button_exit.triggered.connect(lambda: self.closeEvent())
 
         #file I/O actions
-        new = QAction("&New", self)
         save = QAction("&Save", self)
         load = QAction("&Load", self)
-        file_menu.addAction(new)
+        email = QAction("&Email", self)
         file_menu.addAction(save)
         file_menu.addAction(load)
+        file_menu.addAction(email)
         save.triggered.connect(lambda: self.saveFile())
         load.triggered.connect(lambda: self.loadFile())
+        email.triggered.connect(lambda: self.emailFile())
 
         #create simulation settings layout and running layout
         self.createSimulationSetting()
@@ -286,6 +299,24 @@ class Window(QMainWindow):
         self.setFixedSize(1920, 960)
         self.setWindowTitle("Designer")
         self.changeStyle('fusion')
+
+    def emailFile(self):
+        global designer
+        designer.giveGUIGrid(grid)
+        designer.runSimulation()
+        designer.saveSimulationToFile("email.qc")
+        address = QtWidgets.QInputDialog.getText(self, 'Email Address', 'Email Address:')[0]
+        subjectLine = QtWidgets.QInputDialog.getText(self, 'Subject', 'Subject:')[0]
+        gmail.send(
+            subject=subjectLine,
+            receivers=[address],
+            text="Using the QuantumCircuit Open-Source Software!",
+            attachments={
+                "email.qc": Path("email.qc"),
+            }
+        )
+        print("Email Sent!")
+
 
     def saveFile(self):
         path=QFileDialog.getSaveFileName(self, "Choose Directory","E:\\")

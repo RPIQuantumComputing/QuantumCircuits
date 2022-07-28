@@ -89,7 +89,7 @@ class Designer:
         self.printDesign()
         if(self.numSinceLastShown >= 10 and self.settings.gate_suggestion == True): # If gate suggestions are on
             self.numSinceLastShown = 0
-            self.suggestSimplifications() # Suggest suggestions if number of moves exceeds requirement
+            self.suggestSimplifications(self.grid) # Suggest suggestions if number of moves exceeds requirement
         self.numSinceLastShown += 1
 
     # Replaces gate with empty gate
