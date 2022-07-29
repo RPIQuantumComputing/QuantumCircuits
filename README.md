@@ -14,3 +14,4 @@ Current Feature Set:
   8) Recommends modifications to Standard Gate-Model quantum computing circuits
   9) Allows emailing of your quantum circuit
   10) Provides the user an ability to make their own custom gates
+  11) Undo/Redo Functionality
