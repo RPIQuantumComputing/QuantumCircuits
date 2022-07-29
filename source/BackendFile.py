@@ -10,7 +10,6 @@ try:
     import cupy as np
 except:
     import numpy as np
-    hasCupy = False
 # Various Imports
 import numpy as tnp
 import random

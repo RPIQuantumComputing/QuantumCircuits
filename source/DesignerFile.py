@@ -163,7 +163,7 @@ class Designer:
             fileFormat = pickle.load(fileSave)
             print(fileFormat)
             grid = fileFormat["grid"]
-            self.results = fileFormat["results"]
+            self.result = fileFormat["results"]
             self.settings = fileFormat["settings"]
             if(self.results != None and self.settings.backend == "HamiltonianSimulation"):
                 results = self.result

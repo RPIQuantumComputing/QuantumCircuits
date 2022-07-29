@@ -14,7 +14,6 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 import DesignerFile
 from redmail import EmailSender
 from redmail import outlook
-import tempfile
 
 from pathlib import Path
 import pandas as pd
@@ -39,7 +38,7 @@ currentHeight = 6
 offSetHorizontal = 3
 
 customGates = {}
-positionsWithCustomGates = {(-1, -1)}
+positionsWithCustomGates = {(-1, -1): "NA"}
 
 # Default to the "-" gate, store previous position of barrier
 grid = [["-" for i in range(currentWidth + offSetHorizontal)] for j in range(currentHeight)]
@@ -58,10 +57,6 @@ DWaveVar = ""
 DWaveCon = ""
 DwaveObjective = ""
 
-
-#Global stacks for undo and redo 
-undoStack = []
-redoStack = []
 # For field elements that complete change layout
 def forceUpdate():
     global window
@@ -255,7 +250,7 @@ def updateGrid():
     global grid
     global needToUpdate
     grid = designer.getGUIGrid()
-    needToUpdate = True    
+    needToUpdate = True
 
 # Changes Width of Quantum Circuit
 def updateNumWidth(val):
@@ -306,18 +301,12 @@ class Window(QMainWindow):
         save = QAction("&Save", self)
         load = QAction("&Load", self)
         email = QAction("&Email", self)
-        undo = QAction("&Undo", self)
-        redo = QAction("&Redo", self)
         file_menu.addAction(save)
         file_menu.addAction(load)
         file_menu.addAction(email)
-        file_menu.addAction(undo)
-        file_menu.addAction(redo)
         save.triggered.connect(lambda: self.saveFile())
         load.triggered.connect(lambda: self.loadFile())
         email.triggered.connect(lambda: self.emailFile())
-        undo.triggered.connect(lambda: self.undo())
-        redo.triggered.connect(lambda: self.redo())
 
         #create simulation settings layout and running layout
         self.createSimulationSetting()
@@ -333,7 +322,6 @@ class Window(QMainWindow):
         self.setCentralWidget(self.grid)
 
         #set fixed size for drag & drop precision
-        self.setFixedSize(1920, 960)
         self.setWindowTitle("Designer")
         self.changeStyle('fusion')
 
@@ -341,7 +329,7 @@ class Window(QMainWindow):
         global designer
         designer.giveGUIGrid(grid)
         designer.runSimulation()
-        designer.saveSimulationToFileName("email.qc")
+        designer.saveSimulationToFile("email.qc")
         address = QtWidgets.QInputDialog.getText(self, 'Email Address', 'Email Address:')[0]
         subjectLine = QtWidgets.QInputDialog.getText(self, 'Subject', 'Subject:')[0]
         gmail.send(
@@ -369,27 +357,6 @@ class Window(QMainWindow):
         updateGrid()
         designer.printDesign()
 
-    def undo(self):
-        f = tempfile.NamedTemporaryFile(delete=False)
-        designer.saveSimulationToFile(f.name)
-        redoStack.append(f.name)
-        f.close()
-        f = undoStack.pop()
-        designer.loadSimulationFromFile(f)
-        os.remove(f)
-        updateGrid()
-        designer.printDesign()
-
-    def redo(self):
-        f = tempfile.NamedTemporaryFile(delete=False)
-        designer.saveSimulationToFile(f.name)
-        undoStack.append(f.name)
-        f.close()
-        f = redoStack.pop()
-        designer.loadSimulationFromFile(f)
-        os.remove(f)
-        updateGrid()
-        designer.printDesign()
 
     #override close event to make sure pop-up window will close when
     #main window is close, otherwise a not-responding pop-up will remain
@@ -398,10 +365,6 @@ class Window(QMainWindow):
         if (self.dwave_tab):
             self.dwave_tab.close()           
         self.close()
-        for f in undoStack:
-            os.remove(f)
-        for f in redoStack:
-            os.remove(f)
 
     def changeStyle(self, styleName):
         QApplication.setStyle(QStyleFactory.create(styleName))
@@ -614,6 +577,7 @@ class Window(QMainWindow):
 
         customGates[customGateName[0]] = customGrid
 
+        forceUpdate()
         self.grid.updateGUILayout()
         print("--------------------------------------")
         for i in range(len(grid)):
@@ -816,11 +780,13 @@ class IndicSelectWindow(QDialog):
             drag.exec_()
         global needToUpdate
         global grid
+        global positionsWithCustomGates
         # If we need to update the grid, update all positions to have GUI be consistent with Grid 2D array
         if needToUpdate:
             print("Updating....")
             needToUpdate = False
             skipThis = [-1, -1]
+            skip = {(-1, -1)}
             for i in range(offSetHorizontal, currentWidth + offSetHorizontal):
                 for j in range(currentHeight):
                     self.Frame = QFrame(self)
@@ -831,21 +797,33 @@ class IndicSelectWindow(QDialog):
                     self.figure = Figure()  # a figure to plot on
                     self.canvas = FigureCanvas(self.figure)
                     self.ax = self.figure.add_subplot(111)  # create an axis
-                    if (grid[j][i] not in customGates):
-                        self.ax.imshow(gateToImage[grid[j][i]])
+                    if((j, i) not in positionsWithCustomGates and (j, i) not in skip):
+                        if (grid[j][i] not in customGates):
+                            self.ax.imshow(gateToImage[grid[j][i]])
+                        else:
+                            self.ax.text(0.5, 0.5, grid[j][i], horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
+                        self.ax.set_axis_off()
+                        self.canvas.draw()  # refresh canvas
+                        self.canvas.installEventFilter(self)
+                        self.layout.addWidget(self.canvas)
+                        Box = QVBoxLayout()
+                        Box.addWidget(self.Frame)
+                        self.gridLayout.removeItem(self.gridLayout.itemAtPosition(j, i))
+                        self.gridLayout.addLayout(Box, j, i)
                     else:
-                        self.ax.text(0.5, 0.5, grid[j][i], horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
-                    self.ax.set_axis_off()
-                    self.canvas.draw()  # refresh canvas
-                    self.canvas.installEventFilter(self)
-
-                    self.layout.addWidget(self.canvas)
-
-                    Box = QVBoxLayout()
-
-                    Box.addWidget(self.Frame)
-                    self.gridLayout.removeItem(self.gridLayout.itemAtPosition(j, i))
-                    self.gridLayout.addLayout(Box, j, i)
+                        if((j, i) not in skip):
+                            name = positionsWithCustomGates[(j, i)]
+                            self.ax.set_axis_off()
+                            self.canvas.draw()  # refresh canvas
+                            self.canvas.installEventFilter(self)
+                            self.layout.addWidget(self.canvas)
+                            Box = QVBoxLayout()
+                            Box.addWidget(self.Frame)
+                            self.gridLayout.addLayout(Box, j, i, len(customGates[name][0]), len(customGates[name][1]))
+                            for x in range(len(customGates[name][0])):
+                                for y in range(len(customGates[name][1])):
+                                    skip.add((j + x, i + y))
+                                    self.gridLayout.removeItem(self.gridLayout.itemAtPosition(j + x, i + y))
 
     # If releasing, event on drag and drop occured, so neglect this gate
     def mouseReleaseEvent(self, event):
@@ -868,6 +846,8 @@ class IndicSelectWindow(QDialog):
             i, j = max(self.target, source), min(self.target, source)
             row, col, _, _ = self.gridLayout.getItemPosition(self.target)
             row2, col2, _, _ = self.gridLayout.getItemPosition(source)
+            global positionsWithCustomGates
+            global customGates
             # If it is a photonic gate, get necessary values for gate specification
             global photonicMode
             if (photonicMode == True):
@@ -883,11 +863,6 @@ class IndicSelectWindow(QDialog):
             p1, p2 = self.gridLayout.getItemPosition(self.target), self.gridLayout.getItemPosition(source)
             # If we are moving a point on the user board, replace positions
             if(self.gridLayout.getItemPosition(self.target)[1] < offSetHorizontal):
-                designer.giveGUIGrid(grid)
-                f = tempfile.NamedTemporaryFile(delete=False)
-                designer.saveSimulationToFile(f.name)
-                undoStack.append(f.name)
-                f.close()
                 self.Frame = QFrame(self)
                 self.Frame.setStyleSheet("background-color: white;")
                 self.Frame.setLineWidth(0)
@@ -896,14 +871,15 @@ class IndicSelectWindow(QDialog):
                 self.canvas = FigureCanvas(self.figure)
                 self.ax = self.figure.add_subplot(111)  # create an axis
                 isCustom = False
-                global customGates
-                global positionsWithCustomGates
                 if(inital(row, col) not in customGates):
                     self.ax.imshow(gateToImage[inital(row, col)])
                 else:
                     self.ax.text(0.5, 0.5, inital(row, col), horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
                     isCustom = True
                     print("Dropped Custom (Drag and Drop)")
+                if((row, col) in positionsWithCustomGates):
+                    isCustom = True
+                    grid[row][col]
                 self.ax.set_axis_off()
                 self.canvas.draw()  # refresh canvas
                 self.canvas.installEventFilter(self)
@@ -919,9 +895,40 @@ class IndicSelectWindow(QDialog):
                     self.gridLayout.addLayout(Box, row2, col2) #row2, col2
                     grid[row2][col2] = grid[row][col]
             else: # Else, ONLY move the gate in the user board
-                self.gridLayout.addItem(self.gridLayout.takeAt(self.target), *p2)
-                self.gridLayout.addItem(self.gridLayout.takeAt(source), *p1)
+                isCustom = False
+                if((row, col) in positionsWithCustomGates):
+                    name = positionsWithCustomGates[(row, col)]
+                    for x in range(len(customGates[name][0])):
+                        for y in range(len(customGates[name][1])):
+                            grid[row + x][col + y] = "-"
+                            self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row + x, col + y))
+                    grid[row][col] = name
+                    self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row, col))
+                    del positionsWithCustomGates[(row, col)]
+                    isCustom = True
+                if((row2, col2) in positionsWithCustomGates):
+                    name = positionsWithCustomGates[(row2, col2)]
+                    for x in range(len(customGates[name][0])):
+                        for y in range(len(customGates[name][1])):
+                            grid[row2 + x][col2 + y] = "-"
+                            self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row2 + x, col2 + y))
+                    grid[row2][col2] = name
+                    self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row2, col2))
+                    del positionsWithCustomGates[(row2, col2)]
+                    isCustom = True
                 grid[row][col], grid[row2][col2] = grid[row2][col2], grid[row][col]
+                if(isCustom):
+                    print("Calling updateGUILayout")
+                    self.canvas.draw()
+                    self.updateGUILayout()
+                else:
+                    tempA = self.gridLayout.itemAtPosition(row, col)
+                    tempB = self.gridLayout.itemAtPosition(row2, col2)
+                    self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row, col))
+                    self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row2, col2))
+                    self.gridLayout.addItem(tempA, *p2)
+                    self.gridLayout.addItem(tempB, *p1)
+
             # Print out the grid (for debugging purposes)
             print("Quantum Circuit Printout:")
             print(grid)
@@ -957,6 +964,7 @@ class IndicSelectWindow(QDialog):
         global currentWidth
         # Basically a repeat from GUI initalization, see those comments for explainations
         skipThis = [-1, -1]
+        print("Is this it?")
         for j in range(1, offSetHorizontal + 1):
             for i in range(currentHeight):
                 if(skipThis[0] == i and skipThis[1] == j):
@@ -983,8 +991,7 @@ class IndicSelectWindow(QDialog):
                     if(grid[i][j - 1] not in customGates):
                         self.ax.imshow(gateToImage[grid[i][j - 1]])
                     else:
-                        self.ax.text(0.5, 0.5, grid[j][i], horizontalalignment='center', verticalalignment='center',transform=self.ax.transAxes)
-
+                        self.ax.text(0.5, 0.5, grid[j][i-1], horizontalalignment='center', verticalalignment='center',transform=self.ax.transAxes)
                     self.ax.set_axis_off()
                     self.canvas.draw()  # refresh canvas
                     self.layout.addWidget(self.canvas)
@@ -1008,11 +1015,18 @@ class IndicSelectWindow(QDialog):
                 if(grid[j][i] not in customGates and (j, i) not in positionsWithCustomGates):
                     self.ax.imshow(gateToImage[grid[j][i]])
                 else:
-                    self.ax.text(0.5, 0.5, grid[j][i], horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
                     if((j, i) not in positionsWithCustomGates):
+                        self.ax.text(0.5, 0.5, grid[j][i], horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
                         isCustom = True
                         print("Custom Detected")
                         name = grid[j][i]
+                    else:
+                        name = positionsWithCustomGates[(j, i)]
+                        for x in range(len(customGates[name][0])):
+                            for y in range(len(customGates[name][1])):
+                                skip.append((j + x, i + y))
+                                self.gridLayout.removeItem(self.gridLayout.itemAtPosition(j + x, i + y))
+                        self.gridLayout.addLayout(Box, j, i, len(customGates[name][0]), len(customGates[name][1]))
                 if((j, i) in skip):
                     self.ax.imshow(gateToImage[" "])
                 self.ax.set_axis_off()
@@ -1029,7 +1043,7 @@ class IndicSelectWindow(QDialog):
                         for y in range(len(customGates[name][1])):
                             grid[j+x][i+y] = (customGates[name])[x][y]
                             skip.append((j+x, i+y))
-                    positionsWithCustomGates.add((j, i))
+                    positionsWithCustomGates[(j, i)] = name
         print("UPDATED-------------------")
 # Create the application, window, and close application if asked
 app = QApplication(sys.argv)
