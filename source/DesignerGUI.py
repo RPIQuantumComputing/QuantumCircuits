@@ -17,8 +17,6 @@ from redmail import outlook
 
 from pathlib import Path
 import pandas as pd
-import tempfile
-
 
 # Default X ignore
 ignoreX = 4
@@ -41,8 +39,6 @@ offSetHorizontal = 3
 
 customGates = {}
 positionsWithCustomGates = {(-1, -1): "NA"}
-undoStack = []
-redoStack = []
 
 # Default to the "-" gate, store previous position of barrier
 grid = [["-" for i in range(currentWidth + offSetHorizontal)] for j in range(currentHeight)]
@@ -107,34 +103,36 @@ def inital(row, col):
         if(row == 0 and col == 1):
             return "PZ"
         if(row == 0 and col == 2):
-            return "PS"
+            return "PX"
         if(row == 0 and col == 3):
-            return "PS2"
+            return "PS"
         if(row == 1 and col == 0):
-            return "PMZ"
+            return "PS2"
         if(row == 1 and col == 1):
-            return "PCX"
+            return "PMZ"
         if(row == 1 and col == 2):
-            return "PD"
+            return "PCX"
         if(row == 1 and col == 3):
-            return "PF"
+            return "PD"
         if(row == 2 and col == 0):
-            return "PBS"
+            return "PF"
         if(row == 2 and col == 1):
-            return "PCK"
+            return "PBS"
         if(row == 2 and col == 2):
-            return "PPC"
+            return "PCK"
         if(row == 2 and col == 3):
-            return "PPF"
+            return "PPC"
         if(row == 3 and col == 0):
-            return "PPV"
+            return "PPF"
         if(row == 3 and col == 1):
+            return "PPV"
+        if(row == 3 and col == 2):
             if(len(customGates) != 0):
                 return list(customGates.keys())[0]
-        if(row == 3 and col == 2):
+        if(row == 3 and col == 3):
             if(len(customGates) > 1):
                 return list(customGates.keys())[1]
-        if(row == 3 and col == 3):
+        if(row == 4 and col == 0):
             if(len(customGates) > 2):
                 return list(customGates.keys())[2]
     return " "
@@ -303,18 +301,12 @@ class Window(QMainWindow):
         save = QAction("&Save", self)
         load = QAction("&Load", self)
         email = QAction("&Email", self)
-        undo = QAction("&Undo", self)
-        redo = QAction("&Redo", self)
         file_menu.addAction(save)
         file_menu.addAction(load)
         file_menu.addAction(email)
-        file_menu.addAction(undo)
-        file_menu.addAction(redo)
         save.triggered.connect(lambda: self.saveFile())
         load.triggered.connect(lambda: self.loadFile())
         email.triggered.connect(lambda: self.emailFile())
-        undo.triggered.connect(lambda: self.undo())
-        redo.triggered.connect(lambda: self.redo())
 
         #create simulation settings layout and running layout
         self.createSimulationSetting()
@@ -365,28 +357,6 @@ class Window(QMainWindow):
         updateGrid()
         designer.printDesign()
 
-    def undo(self):
-        f = tempfile.NamedTemporaryFile(delete=False)
-        designer.saveSimulationToFile(f.name)
-        redoStack.append(f.name)
-        f.close()
-        f = undoStack.pop()
-        designer.loadSimulationFromFile(f)
-        os.remove(f)
-        updateGrid()
-        designer.printDesign()
-
-    def redo(self):
-        f = tempfile.NamedTemporaryFile(delete=False)
-        designer.saveSimulationToFile(f.name)
-        undoStack.append(f.name)
-        f.close()
-        f = redoStack.pop()
-        designer.loadSimulationFromFile(f)
-        os.remove(f)
-        updateGrid()
-        designer.printDesign()
-
 
     #override close event to make sure pop-up window will close when
     #main window is close, otherwise a not-responding pop-up will remain
@@ -395,16 +365,6 @@ class Window(QMainWindow):
         if (self.dwave_tab):
             self.dwave_tab.close()           
         self.close()
-        for f in undoStack:
-            try:
-                os.remove(f)
-            except:
-                pass
-        for f in redoStack:
-            try:
-                os.remove(f)
-            except:
-                pass
 
     def changeStyle(self, styleName):
         QApplication.setStyle(QStyleFactory.create(styleName))
@@ -903,11 +863,6 @@ class IndicSelectWindow(QDialog):
             p1, p2 = self.gridLayout.getItemPosition(self.target), self.gridLayout.getItemPosition(source)
             # If we are moving a point on the user board, replace positions
             if(self.gridLayout.getItemPosition(self.target)[1] < offSetHorizontal):
-                designer.giveGUIGrid(grid)
-                f = tempfile.NamedTemporaryFile(delete=False)
-                designer.saveSimulationToFile(f.name)
-                undoStack.append(f.name)
-                f.close()
                 self.Frame = QFrame(self)
                 self.Frame.setStyleSheet("background-color: white;")
                 self.Frame.setLineWidth(0)
@@ -1061,7 +1016,9 @@ class IndicSelectWindow(QDialog):
                     self.ax.imshow(gateToImage[grid[j][i]])
                 else:
                     if((j, i) not in positionsWithCustomGates):
-                        self.ax.text(0.5, 0.5, grid[j][i], horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
+                        self.Frame.setStyleSheet("background-color: black;")
+                        self.ax.text(0.2, 0.75, grid[j][i], horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
+                        self.ax.imshow(gateToImage[" "])
                         isCustom = True
                         print("Custom Detected")
                         name = grid[j][i]
@@ -1074,6 +1031,7 @@ class IndicSelectWindow(QDialog):
                         self.gridLayout.addLayout(Box, j, i, len(customGates[name][0]), len(customGates[name][1]))
                 if((j, i) in skip):
                     self.ax.imshow(gateToImage[" "])
+                    self.Frame.setStyleSheet("background-color: black;")
                 self.ax.set_axis_off()
                 self.canvas.draw()  # refresh canvas
                 self.canvas.installEventFilter(self)
