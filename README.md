@@ -12,3 +12,4 @@ Current Feature Set:
   6) Use IBM's Quantum Computers to run circuit
   7) Allows QUBO specification to be run on DWave's Quantum Annealer
   8) Recommends modifications to Standard Gate-Model quantum computing circuits
+  9) Allows emailing of your quantum circuit
