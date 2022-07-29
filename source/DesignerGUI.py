@@ -11,12 +11,11 @@ from PIL import Image
 from threading import *
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from PyQt5 import QtCore, QtGui, QtWidgets
+import smtplib
 import DesignerFile
 
 # Default X ignore
 ignoreX = 4
-
-# Load up all graphic images, Singleton design pattern
 gateToImage = {" ": Image.open("../assets/EMPTY.png"), "-": Image.open("../assets/GATE.png"), "H": Image.open("../assets/H.png"), 
                 "T": Image.open("../assets/T.png"), "S": Image.open("../assets/S.png"), "X": Image.open("../assets/X.png"), "Y": Image.open("../assets/Y.png"),
                 "Z": Image.open("../assets/Z.png"), "CNOT": Image.open("../assets/CNOT.png"),
@@ -25,15 +24,13 @@ gateToImage = {" ": Image.open("../assets/EMPTY.png"), "-": Image.open("../asset
                "PMZ": Image.open("../assets/PMZ.png"), "PPC": Image.open("../assets/PPC.png"), "PPF": Image.open("../assets/PPF.png"),
                "PPV": Image.open("../assets/PPV.png"), "PS": Image.open("../assets/PS.png"), "PS2": Image.open("../assets/PS2.png"),
                "PV": Image.open("../assets/PV.png"), "PX": Image.open("../assets/PX.png"), "PZ": Image.open("../assets/PZ.png")}
-
-# Same grid information, offSetHorizontal offsets to the play field (where user puts gates)
-# from the gate storage and barrier positions
 currentWidth = 8
 currentHeight = 6
 offSetHorizontal = 3
 
 # Default to the "-" gate, store previous position of barrier
 grid = [["-" for i in range(currentWidth + offSetHorizontal)] for j in range(currentHeight)]
+customGates = {}
 priorBarrier = [-1,-1,-1,-1]
 
 # Initalize Designer
@@ -60,7 +57,7 @@ def forceUpdate():
 def inital(row, col):
     if(photonicMode == False):
         if(row == 0 and col == 0):
-            return "H"
+            return "H" 
         if(row == 0 and col == 1):
             return "X"
         if(row == 1 and col == 0):
@@ -73,6 +70,16 @@ def inital(row, col):
             return "T"
         if(row == 3 and col == 0):
             return "CNOT"
+        if(row == 3 and col == 1):
+            if(len(customGates) != 0):
+                return list(customGates.keys())[0]
+        if(row == 4 and col == 0):
+            if(len(customGates) > 1):
+                return list(customGates.keys())[1]
+        if(row == 4 and col == 1):
+            if(len(customGates) > 2):
+                return list(customGates.keys())[2]
+        
     else:
         if(row == 0 and col == 0):
             return "PX"
@@ -102,6 +109,15 @@ def inital(row, col):
             return "PPF"
         if(row == 3 and col == 1):
             return "PPV"
+        if(row == 3 and col == 2):
+            if(len(customGates) != 0):
+                return list(customGates.keys())[0]
+        if(row == 3 and col == 3):
+            if(len(customGates) > 1):
+                return list(customGates.keys())[1]
+        if(row == 4 and col == 0):
+            if(len(customGates) > 2):
+                return list(customGates.keys())[2]
     return " "
 
 
@@ -254,6 +270,17 @@ class Window(QMainWindow):
         menu.addMenu(button_qiskit)
         button_xanadu = QMenu("&IBM Xanadu", self)
         menu.addMenu(button_xanadu)
+
+        button_custom_gate = QAction("&Custom Gate Creation", self)
+        menu.addAction(button_custom_gate)
+        #self.custom_gate_tab = CustomGateTab(self)
+        button_custom_gate.triggered.connect(lambda: self.makeCustomGate())
+    
+        button_email = QAction("&Email", self)
+        menu.addAction(button_email)
+        self.email_tab = EmailTab(self)
+        button_email.triggered.connect(lambda: self.showEmailTab())
+        
         button_exit = QAction("&Exit", self)
         menu.addAction(button_exit)
         #additional exit button (why not)
@@ -488,10 +515,57 @@ class Window(QMainWindow):
         elif (spin.callsign == "numwidth"):
             updateNumWidth(val)
             forceUpdate()
+    
+    def makeCustomGate(self):
+        x1 = QtWidgets.QInputDialog.getInt(self, 'X1', 'Input:')
+        if (x1[1] == True):
+            print(x1[0])
+            x2 = QtWidgets.QInputDialog.getInt(self, 'X2', 'Input:')
+            if (x2[1] == True):
+                print(x2[0])
+                y1 = QtWidgets.QInputDialog.getInt(self, 'Y1', 'Input:')
+                if (y1[1] == True):
+                    print(y1[0])
+                    y2 = QtWidgets.QInputDialog.getInt(self, 'Y2', 'Input:')
+                    if (y2[1] == True):
+                        print(y2[0])
+        
+        print(grid[y1[0]][x1[0] + offSetHorizontal])
+        print(grid[y2[0]][x2[0] + offSetHorizontal])
+
+        customGrid = [["-" for i in range(x2[0]-x1[0]+1 + offSetHorizontal)] for j in range(y2[0]-y1[0]+1)]
+
+        for i in range(y1[0], y2[0] + 1):
+            for j in range(x1[0] + offSetHorizontal, x2[0] + offSetHorizontal + 1):
+                customGrid[i][j] = grid[i][j]
+
+        customGateName = QtWidgets.QInputDialog.getText(self, 'Custom Gate Name', 'Input:')
+        print(customGateName)
+        if(customGateName[1] == False):
+            return
+
+        customGates[customGateName[0]] = customGrid
+
+        self.grid.updateGUILayout()
+        print("--------------------------------------")
+        for i in range(len(grid)):
+            strtemp = ""
+            for j in range(len(grid[0])):
+                strtemp += grid[i][j]
+            print(strtemp)
+        print("--------------------------------------")
+
+        print(customGates)
 
     #let Dwave input tab show when user clicks on toolbar
     def showDWaveTab(self):
         self.dwave_tab.show()
+    
+    def showEmailTab(self):
+        self.email_tab.show()
+
+    """def showCustomGateTab(self):
+        self.custom_gate_tab.show()"""
 
 
 #a Qdialog that pops up when use clicks the 'DWave' button on toolbar
@@ -545,6 +619,28 @@ class DWaveTab(QDialog):
         DwaveObjective = self.dwave_obj.text()
         self.close()
 
+#a Qdialog that pops up when use clicks the 'Email' button on toolbar
+class EmailTab(QDialog):
+    def __init__(self, parent=Window):
+        super(EmailTab, self).__init__(parent=parent)
+        self.layout = QVBoxLayout(self)
+        self.setLayout(self.layout)
+        self.resize(800, 600)
+
+"""#a Qdialog that pops up when use clicks the 'Custom Gate Creation' button on toolbar
+class CustomGateTab(QDialog):
+    def __init__(self, parent=Window):
+        super(CustomGateTab, self).__init__(parent=parent)
+        self.layout = QVBoxLayout(self)
+        self.setLayout(self.layout)
+        self.resize(800, 600) 
+        self.setWindowTitle("Custom Gate Creation")
+
+
+        line_edit = QLineEdit("", self)
+        line_edit.setGeometry(80, 80, 150, 40)"""
+
+
 #the main workbench of qcd, a grid that supports drag & drop
 class IndicSelectWindow(QDialog):
     def __init__(self, parent=None):
@@ -585,8 +681,17 @@ class IndicSelectWindow(QDialog):
                     global priorBarrier
                     priorBarrier = [i, j - 1, len(grid)-2, 1]
                 else: # If we are adding just a gate
-                    grid[i][j - 1] = inital(i, j - 1) # Find what gate if any should go in position
-                    self.ax.imshow(gateToImage[grid[i][j - 1]]) # Show the gate
+                    grid[i][j - 1] = inital(i, j - 1) # Find what gate if any should go in position hxyzst cnot
+                    if(grid[i][j-1] != "H" and grid[i][j-1] != "X" and grid[i][j-1] != "Y" and 
+                    grid[i][j-1] != "Z" and grid[i][j-1] != "S" and grid[i][j-1] != "T" and
+                    grid[i][j-1] != "CNOT" and grid[i][j-1] != "PBS" and grid[i][j-1] != "PCK" and grid[i][j-1] != "PCX" and 
+                    grid[i][j-1] != "PCZ" and grid[i][j-1] != "PD" and grid[i][j-1] != "PF" and grid[i][j-1] != "PMZ" and 
+                    grid[i][j-1] != "PPC" and grid[i][j-1] != "PPF" and grid[i][j-1] != "PPV" and grid[i][j-1] != "PS" and 
+                    grid[i][j-1] != "PS2" and grid[i][j-1] != "PV" and grid[i][j-1] != "PX" and grid[i][j-1] != "PZ"):
+                        self.ax.text(0.5,0.5,grid[i][j-1],horizontalalignment='center',
+                                    verticalalignment='center', transform = self.ax.transAxes)
+                    else:
+                        self.ax.imshow(gateToImage[grid[i][j - 1]]) # Show the gate if premade
                     self.ax.set_axis_off()
                     self.canvas.draw()  # refresh canvas
                     self.layout.addWidget(self.canvas)
@@ -594,6 +699,7 @@ class IndicSelectWindow(QDialog):
                     Box = QVBoxLayout()
                     Box.addWidget(self.Frame)
                     self.gridLayout.addLayout(Box, i, j - 1)
+
         # Go through and initalize field user interacts with
         for i in range(offSetHorizontal, currentWidth + offSetHorizontal):
             for j in range(currentHeight):
@@ -747,7 +853,19 @@ class IndicSelectWindow(QDialog):
                 self.figure = Figure()  # a figure to plot on
                 self.canvas = FigureCanvas(self.figure)
                 self.ax = self.figure.add_subplot(111)  # create an axis
-                self.ax.imshow(gateToImage[inital(row, col)])
+                iscustom = False
+                if(inital(row, col) != "H" and inital(row, col) != "X" and inital(row, col) != "Y" and 
+                    inital(row, col) != "Z" and inital(row, col) != "S" and inital(row, col) != "T" and
+                    inital(row, col) != "CNOT" and inital(row, col) != "PBS" and inital(row, col) != "PCK" and inital(row, col) != "PCX" and 
+                    inital(row, col) != "PCZ" and inital(row, col) != "PD" and inital(row, col) != "PF" and inital(row, col) != "PMZ" and 
+                    inital(row, col) != "PPC" and inital(row, col) != "PPF" and inital(row, col) != "PPV" and inital(row, col) != "PS" and 
+                    inital(row, col) != "PS2" and inital(row, col) != "PV" and inital(row, col) != "PX" and inital(row, col) != "PZ" and 
+                    inital(row, col) != " "):
+                    self.ax.text(0.5,0.5,inital(row, col),horizontalalignment='center',
+                                    verticalalignment='center', transform = self.ax.transAxes)
+                    iscustom = True
+                else:
+                    self.ax.imshow(gateToImage[inital(row, col)])
                 self.ax.set_axis_off()
                 self.canvas.draw()  # refresh canvas
                 self.canvas.installEventFilter(self)
@@ -755,8 +873,20 @@ class IndicSelectWindow(QDialog):
                 Box = QVBoxLayout()
                 Box.addWidget(self.Frame)
                 self.gridLayout.takeAt(source)
-                self.gridLayout.addLayout(Box, row2, col2)
-                grid[row2][col2] = grid[row][col]
+                if(iscustom):
+                    length = len(customGates[inital(row, col)])
+                    width = len(customGates[inital(row, col)][0])
+                    self.gridLayout.addLayout(Box, row2, col2, length, width - 3)
+                    for j in range(width - offSetHorizontal):
+                        for i in range(length):
+                            grid[i][j] = customGates[inital(row, col)][i][j]
+                            #print("COL: ", i+col2, end="")
+                            #print("ROW: ", j+row2, end="")
+
+                        #print(j)    
+                else:
+                    self.gridLayout.addLayout(Box, row2, col2) #row2, col2
+                    grid[row2][col2] = grid[row][col]
             else: # Else, ONLY move the gate in the user board
                 self.gridLayout.addItem(self.gridLayout.takeAt(self.target), *p2)
                 self.gridLayout.addItem(self.gridLayout.takeAt(source), *p1)
@@ -796,10 +926,6 @@ class IndicSelectWindow(QDialog):
         skipThis = [-1, -1]
         for j in range(1, offSetHorizontal + 1):
             for i in range(currentHeight):
-                if(skipThis[0] == i and skipThis[1] == j):
-                    grid[i][j - 1] = " "
-                    break
-                grid[i][j-1] = " "
                 self.Frame = QFrame(self)
                 self.Frame.setStyleSheet("background-color: white;")
                 self.Frame.setFrameStyle(QFrame.Panel | QFrame.Raised)
@@ -809,25 +935,19 @@ class IndicSelectWindow(QDialog):
                 self.figure = Figure()  # a figure to plot on
                 self.canvas = FigureCanvas(self.figure)
                 self.ax = self.figure.add_subplot(111)  # create an axis
-                if(j == offSetHorizontal):
-                    self.Frame.setStyleSheet("background-color: grey;")
-                    Box = QVBoxLayout()
-                    Box.addWidget(self.Frame)
-                    self.gridLayout.addLayout(Box, i, j-1, len(grid)-2, 1)
-                    priorBarrier = [i, j-1, len(grid)-2, 1]
-                else:
-                    grid[i][j - 1] = inital(i, j - 1)
-                    self.ax.imshow(gateToImage[grid[i][j - 1]])
-                    self.ax.set_axis_off()
-                    self.canvas.draw()  # refresh canvas
-                    self.layout.addWidget(self.canvas)
-                    self.canvas.installEventFilter(self)
-                    Box = QVBoxLayout()
-                    Box.addWidget(self.Frame)
-                    self.gridLayout.addLayout(Box, i, j - 1)
-        for i in range(offSetHorizontal, currentWidth + offSetHorizontal):
-            for j in range(currentHeight):
-                grid[j][i] = "-"
+                if(j != offSetHorizontal):
+                    if(grid[i][j-1] in customGates and inital(i, j-1) in customGates):
+                        self.ax.text(0.5,0.5,grid[i][j-1],horizontalalignment='center',
+                                    verticalalignment='center', transform = self.ax.transAxes)
+                        self.ax.set_axis_off()
+                        self.canvas.draw()  # refresh canvas
+                        self.layout.addWidget(self.canvas)
+                        self.canvas.installEventFilter(self)
+                        Box = QVBoxLayout()
+                        Box.addWidget(self.Frame)
+                        self.gridLayout.addLayout(Box, i, j - 1)
+        for j in range(offSetHorizontal, currentWidth + offSetHorizontal):
+            for i in range(currentHeight):
                 self.Frame = QFrame(self)
                 self.Frame.setStyleSheet("background-color: white;")
                 self.Frame.setLineWidth(0)
@@ -836,18 +956,20 @@ class IndicSelectWindow(QDialog):
                 self.figure = Figure()  # a figure to plot on
                 self.canvas = FigureCanvas(self.figure)
                 self.ax = self.figure.add_subplot(111)  # create an axis
-                self.ax.imshow(gateToImage["-"])
-                self.ax.set_axis_off()
-                self.canvas.draw()  # refresh canvas
-                self.canvas.installEventFilter(self)
 
-                self.layout.addWidget(self.canvas)
+                if(grid[i][j] not in customGates):
+                    self.ax.imshow(gateToImage[grid[i][j]])
+                    self.ax.set_axis_off()
+                    self.canvas.draw()  # refresh canvas
+                    self.canvas.installEventFilter(self)
 
-                Box = QVBoxLayout()
+                    self.layout.addWidget(self.canvas)
 
-                Box.addWidget(self.Frame)
+                    Box = QVBoxLayout()
 
-                self.gridLayout.addLayout(Box, j, i)
+                    Box.addWidget(self.Frame)
+
+                    self.gridLayout.addLayout(Box, i, j)
 
 # Create the application, window, and close application if asked
 app = QApplication(sys.argv)
