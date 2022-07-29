@@ -374,7 +374,9 @@ class Window(QMainWindow):
         designer.saveSimulationToFile(f.name)
         redoStack.append(f.name)
         f.close()
-        designer.loadSimulationFromFile(undoStack.pop())
+        f = undoStack.pop()
+        designer.loadSimulationFromFile(f)
+        os.remove(f)
         updateGrid()
         designer.printDesign()
 
@@ -383,7 +385,9 @@ class Window(QMainWindow):
         designer.saveSimulationToFile(f.name)
         undoStack.append(f.name)
         f.close()
-        designer.loadSimulationFromFile(redoStack.pop())
+        f = redoStack.pop()
+        designer.loadSimulationFromFile(f)
+        os.remove(f)
         updateGrid()
         designer.printDesign()
 
@@ -394,6 +398,10 @@ class Window(QMainWindow):
         if (self.dwave_tab):
             self.dwave_tab.close()           
         self.close()
+        for f in undoStack:
+            os.remove(f)
+        for f in redoStack:
+            os.remove(f)
 
     def changeStyle(self, styleName):
         QApplication.setStyle(QStyleFactory.create(styleName))
