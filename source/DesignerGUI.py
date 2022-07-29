@@ -14,6 +14,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 import DesignerFile
 from redmail import EmailSender
 from redmail import outlook
+import tempfile
 
 from pathlib import Path
 import pandas as pd
@@ -57,6 +58,10 @@ DWaveVar = ""
 DWaveCon = ""
 DwaveObjective = ""
 
+
+#Global stacks for undo and redo 
+undoStack = []
+redoStack = []
 # For field elements that complete change layout
 def forceUpdate():
     global window
@@ -301,12 +306,18 @@ class Window(QMainWindow):
         save = QAction("&Save", self)
         load = QAction("&Load", self)
         email = QAction("&Email", self)
+        undo = QAction("&Undo", self)
+        redo = QAction("&Redo", self)
         file_menu.addAction(save)
         file_menu.addAction(load)
         file_menu.addAction(email)
+        file_menu.addAction(undo)
+        file_menu.addAction(redo)
         save.triggered.connect(lambda: self.saveFile())
         load.triggered.connect(lambda: self.loadFile())
         email.triggered.connect(lambda: self.emailFile())
+        undo.triggered.connect(lambda: self.undo())
+        redo.triggered.connect(lambda: self.redo())
 
         #create simulation settings layout and running layout
         self.createSimulationSetting()
@@ -330,7 +341,7 @@ class Window(QMainWindow):
         global designer
         designer.giveGUIGrid(grid)
         designer.runSimulation()
-        designer.saveSimulationToFile("email.qc")
+        designer.saveSimulationToFileName("email.qc")
         address = QtWidgets.QInputDialog.getText(self, 'Email Address', 'Email Address:')[0]
         subjectLine = QtWidgets.QInputDialog.getText(self, 'Subject', 'Subject:')[0]
         gmail.send(
@@ -358,6 +369,27 @@ class Window(QMainWindow):
         updateGrid()
         designer.printDesign()
 
+    def undo(self):
+        f = tempfile.NamedTemporaryFile(delete=False)
+        designer.saveSimulationToFile(f.name)
+        redoStack.append(f.name)
+        f.close()
+        f = undoStack.pop()
+        designer.loadSimulationFromFile(f)
+        os.remove(f)
+        updateGrid()
+        designer.printDesign()
+
+    def redo(self):
+        f = tempfile.NamedTemporaryFile(delete=False)
+        designer.saveSimulationToFile(f.name)
+        undoStack.append(f.name)
+        f.close()
+        f = redoStack.pop()
+        designer.loadSimulationFromFile(f)
+        os.remove(f)
+        updateGrid()
+        designer.printDesign()
 
     #override close event to make sure pop-up window will close when
     #main window is close, otherwise a not-responding pop-up will remain
@@ -366,6 +398,10 @@ class Window(QMainWindow):
         if (self.dwave_tab):
             self.dwave_tab.close()           
         self.close()
+        for f in undoStack:
+            os.remove(f)
+        for f in redoStack:
+            os.remove(f)
 
     def changeStyle(self, styleName):
         QApplication.setStyle(QStyleFactory.create(styleName))
@@ -847,6 +883,11 @@ class IndicSelectWindow(QDialog):
             p1, p2 = self.gridLayout.getItemPosition(self.target), self.gridLayout.getItemPosition(source)
             # If we are moving a point on the user board, replace positions
             if(self.gridLayout.getItemPosition(self.target)[1] < offSetHorizontal):
+                designer.giveGUIGrid(grid)
+                f = tempfile.NamedTemporaryFile(delete=False)
+                designer.saveSimulationToFile(f.name)
+                undoStack.append(f.name)
+                f.close()
                 self.Frame = QFrame(self)
                 self.Frame.setStyleSheet("background-color: white;")
                 self.Frame.setLineWidth(0)
