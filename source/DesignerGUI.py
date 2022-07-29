@@ -1061,7 +1061,9 @@ class IndicSelectWindow(QDialog):
                     self.ax.imshow(gateToImage[grid[j][i]])
                 else:
                     if((j, i) not in positionsWithCustomGates):
-                        self.ax.text(0.5, 0.5, grid[j][i], horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
+                        self.Frame.setStyleSheet("background-color: black;")
+                        self.ax.text(0.2, 0.75, grid[j][i], horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
+                        self.ax.imshow(gateToImage[" "])
                         isCustom = True
                         print("Custom Detected")
                         name = grid[j][i]
@@ -1074,6 +1076,7 @@ class IndicSelectWindow(QDialog):
                         self.gridLayout.addLayout(Box, j, i, len(customGates[name][0]), len(customGates[name][1]))
                 if((j, i) in skip):
                     self.ax.imshow(gateToImage[" "])
+                    self.Frame.setStyleSheet("background-color: black;")
                 self.ax.set_axis_off()
                 self.canvas.draw()  # refresh canvas
                 self.canvas.installEventFilter(self)
