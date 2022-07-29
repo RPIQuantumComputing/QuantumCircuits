@@ -37,6 +37,9 @@ currentWidth = 8
 currentHeight = 6
 offSetHorizontal = 3
 
+customGates = {}
+positionsWithCustomGates = {(-1, -1)}
+
 # Default to the "-" gate, store previous position of barrier
 grid = [["-" for i in range(currentWidth + offSetHorizontal)] for j in range(currentHeight)]
 priorBarrier = [-1,-1,-1,-1]
@@ -85,6 +88,15 @@ def inital(row, col):
             return "T"
         if(row == 3 and col == 0):
             return "CNOT"
+        if(row == 3 and col == 1):
+            if(len(customGates) != 0):
+                return list(customGates.keys())[0]
+        if(row == 4 and col == 0):
+            if(len(customGates) > 1):
+                return list(customGates.keys())[1]
+        if(row == 4 and col == 1):
+            if(len(customGates) > 2):
+                return list(customGates.keys())[2]
     else:
         if(row == 0 and col == 0):
             return "PX"
@@ -114,6 +126,15 @@ def inital(row, col):
             return "PPF"
         if(row == 3 and col == 1):
             return "PPV"
+        if(row == 3 and col == 2):
+            if(len(customGates) != 0):
+                return list(customGates.keys())[0]
+        if(row == 3 and col == 3):
+            if(len(customGates) > 1):
+                return list(customGates.keys())[1]
+        if(row == 4 and col == 0):
+            if(len(customGates) > 2):
+                return list(customGates.keys())[2]
     return " "
 
 
@@ -257,6 +278,11 @@ class Window(QMainWindow):
         menu.addMenu(button_learn)
         button_dwave = QAction("&DWave", self)
         menu.addAction(button_dwave)
+
+        button_custom_gate = QAction("&Custom Gate Creation", self)
+        menu.addAction(button_custom_gate)
+        #self.custom_gate_tab = CustomGateTab(self)
+        button_custom_gate.triggered.connect(lambda: self.makeCustomGate())
 
         #intialize dwave tab for user input
         self.dwave_tab = DWaveTab(self)
@@ -520,6 +546,49 @@ class Window(QMainWindow):
             updateNumWidth(val)
             forceUpdate()
 
+    def makeCustomGate(self):
+        x1 = QtWidgets.QInputDialog.getInt(self, 'X1', 'Input:')
+        if (x1[1] == True):
+            print(x1[0])
+            x2 = QtWidgets.QInputDialog.getInt(self, 'X2', 'Input:')
+            if (x2[1] == True):
+                print(x2[0])
+                y1 = QtWidgets.QInputDialog.getInt(self, 'Y1', 'Input:')
+                if (y1[1] == True):
+                    print(y1[0])
+                    y2 = QtWidgets.QInputDialog.getInt(self, 'Y2', 'Input:')
+                    if (y2[1] == True):
+                        print(y2[0])
+
+        print(grid[y1[0]][x1[0] + offSetHorizontal])
+        print(grid[y2[0]][x2[0] + offSetHorizontal])
+
+        customGrid = [["-" for i in range(x2[0]-x1[0]+1)] for j in range(y2[0]-y1[0]+1)]
+
+        xItr = 0
+        yItr = 0
+        for i in range(y1[0], y2[0] + 1):
+            for j in range(x1[0], x2[0] + 1):
+                customGrid[i-y1[0]][j-x1[0]] = grid[i][j+offSetHorizontal]
+
+        customGateName = QtWidgets.QInputDialog.getText(self, 'Custom Gate Name', 'Input:')
+        print(customGateName)
+        if(customGateName[1] == False):
+            return
+
+        customGates[customGateName[0]] = customGrid
+
+        self.grid.updateGUILayout()
+        print("--------------------------------------")
+        for i in range(len(grid)):
+            strtemp = ""
+            for j in range(len(grid[0])):
+                strtemp += grid[i][j]
+            print(strtemp)
+        print("--------------------------------------")
+
+        print(customGates)
+
     #let Dwave input tab show when user clicks on toolbar
     def showDWaveTab(self):
         self.dwave_tab.show()
@@ -616,8 +685,12 @@ class IndicSelectWindow(QDialog):
                     global priorBarrier
                     priorBarrier = [i, j - 1, len(grid)-2, 1]
                 else: # If we are adding just a gate
+                    global customGates
                     grid[i][j - 1] = inital(i, j - 1) # Find what gate if any should go in position
-                    self.ax.imshow(gateToImage[grid[i][j - 1]]) # Show the gate
+                    if(grid[i][j - 1] in customGates):
+                        self.ax.text(0.5, 0.5, grid[i][j - 1], horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
+                    else:
+                        self.ax.imshow(gateToImage[grid[i][j - 1]]) # Show the gate
                     self.ax.set_axis_off()
                     self.canvas.draw()  # refresh canvas
                     self.layout.addWidget(self.canvas)
@@ -722,7 +795,10 @@ class IndicSelectWindow(QDialog):
                     self.figure = Figure()  # a figure to plot on
                     self.canvas = FigureCanvas(self.figure)
                     self.ax = self.figure.add_subplot(111)  # create an axis
-                    self.ax.imshow(gateToImage[grid[j][i]])
+                    if (grid[j][i] not in customGates):
+                        self.ax.imshow(gateToImage[grid[j][i]])
+                    else:
+                        self.ax.text(0.5, 0.5, grid[j][i], horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
                     self.ax.set_axis_off()
                     self.canvas.draw()  # refresh canvas
                     self.canvas.installEventFilter(self)
@@ -778,7 +854,15 @@ class IndicSelectWindow(QDialog):
                 self.figure = Figure()  # a figure to plot on
                 self.canvas = FigureCanvas(self.figure)
                 self.ax = self.figure.add_subplot(111)  # create an axis
-                self.ax.imshow(gateToImage[inital(row, col)])
+                isCustom = False
+                global customGates
+                global positionsWithCustomGates
+                if(inital(row, col) not in customGates):
+                    self.ax.imshow(gateToImage[inital(row, col)])
+                else:
+                    self.ax.text(0.5, 0.5, inital(row, col), horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
+                    isCustom = True
+                    print("Dropped Custom (Drag and Drop)")
                 self.ax.set_axis_off()
                 self.canvas.draw()  # refresh canvas
                 self.canvas.installEventFilter(self)
@@ -786,8 +870,13 @@ class IndicSelectWindow(QDialog):
                 Box = QVBoxLayout()
                 Box.addWidget(self.Frame)
                 self.gridLayout.takeAt(source)
-                self.gridLayout.addLayout(Box, row2, col2)
-                grid[row2][col2] = grid[row][col]
+                if(isCustom):
+                    print("Calling updateGUILayout")
+                    grid[row2][col2] = grid[row][col]
+                    self.updateGUILayout()
+                else:
+                    self.gridLayout.addLayout(Box, row2, col2) #row2, col2
+                    grid[row2][col2] = grid[row][col]
             else: # Else, ONLY move the gate in the user board
                 self.gridLayout.addItem(self.gridLayout.takeAt(self.target), *p2)
                 self.gridLayout.addItem(self.gridLayout.takeAt(source), *p1)
@@ -822,15 +911,17 @@ class IndicSelectWindow(QDialog):
         global offSetHorizontal
         global grid
         global currentHeight
+        global customGates
+        global positionsWithCustomGates
         global currentWidth
         # Basically a repeat from GUI initalization, see those comments for explainations
         skipThis = [-1, -1]
         for j in range(1, offSetHorizontal + 1):
             for i in range(currentHeight):
                 if(skipThis[0] == i and skipThis[1] == j):
-                    grid[i][j - 1] = " "
+                    grid[i][j - 1] = "-"
                     break
-                grid[i][j-1] = " "
+                grid[i][j-1] = "-"
                 self.Frame = QFrame(self)
                 self.Frame.setStyleSheet("background-color: white;")
                 self.Frame.setFrameStyle(QFrame.Panel | QFrame.Raised)
@@ -848,7 +939,11 @@ class IndicSelectWindow(QDialog):
                     priorBarrier = [i, j-1, len(grid)-2, 1]
                 else:
                     grid[i][j - 1] = inital(i, j - 1)
-                    self.ax.imshow(gateToImage[grid[i][j - 1]])
+                    if(grid[i][j - 1] not in customGates):
+                        self.ax.imshow(gateToImage[grid[i][j - 1]])
+                    else:
+                        self.ax.text(0.5, 0.5, grid[j][i], horizontalalignment='center', verticalalignment='center',transform=self.ax.transAxes)
+
                     self.ax.set_axis_off()
                     self.canvas.draw()  # refresh canvas
                     self.layout.addWidget(self.canvas)
@@ -856,9 +951,9 @@ class IndicSelectWindow(QDialog):
                     Box = QVBoxLayout()
                     Box.addWidget(self.Frame)
                     self.gridLayout.addLayout(Box, i, j - 1)
+        skip = []
         for i in range(offSetHorizontal, currentWidth + offSetHorizontal):
             for j in range(currentHeight):
-                grid[j][i] = "-"
                 self.Frame = QFrame(self)
                 self.Frame.setStyleSheet("background-color: white;")
                 self.Frame.setLineWidth(0)
@@ -867,19 +962,34 @@ class IndicSelectWindow(QDialog):
                 self.figure = Figure()  # a figure to plot on
                 self.canvas = FigureCanvas(self.figure)
                 self.ax = self.figure.add_subplot(111)  # create an axis
-                self.ax.imshow(gateToImage["-"])
+                isCustom = False
+                name = "NA"
+                if(grid[j][i] not in customGates and (j, i) not in positionsWithCustomGates):
+                    self.ax.imshow(gateToImage[grid[j][i]])
+                else:
+                    self.ax.text(0.5, 0.5, grid[j][i], horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
+                    if((j, i) not in positionsWithCustomGates):
+                        isCustom = True
+                        print("Custom Detected")
+                        name = grid[j][i]
+                if((j, i) in skip):
+                    self.ax.imshow(gateToImage[" "])
                 self.ax.set_axis_off()
                 self.canvas.draw()  # refresh canvas
                 self.canvas.installEventFilter(self)
-
                 self.layout.addWidget(self.canvas)
-
                 Box = QVBoxLayout()
-
                 Box.addWidget(self.Frame)
-
-                self.gridLayout.addLayout(Box, j, i)
-
+                if(not isCustom):
+                    self.gridLayout.addLayout(Box, j, i)
+                else:
+                    self.gridLayout.addLayout(Box, j, i, len(customGates[name][0]), len(customGates[name][1]))
+                    for x in range(len(customGates[name][0])):
+                        for y in range(len(customGates[name][1])):
+                            grid[j+x][i+y] = (customGates[name])[x][y]
+                            skip.append((j+x, i+y))
+                    positionsWithCustomGates.add((j, i))
+        print("UPDATED-------------------")
 # Create the application, window, and close application if asked
 app = QApplication(sys.argv)
 window = Window()
