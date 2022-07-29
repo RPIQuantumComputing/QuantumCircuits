@@ -165,7 +165,13 @@ class Designer:
             grid = fileFormat["grid"]
             self.result = fileFormat["results"]
             self.settings = fileFormat["settings"]
-            if(self.results != None and self.settings.backend == "HamiltonianSimulation"):
+            hasResults = False
+            try:
+                print(self.results)
+                hasResults = True
+            except:
+                pass
+            if(hasResults and self.settings.backend == "HamiltonianSimulation"):
                 results = self.result
                 fig = plt.figure(figsize=(20, 5))
                 xVal = []
@@ -197,7 +203,7 @@ class Designer:
                            rotation=-90, labelpad=20)
                 plt.title("Probability Distribution of Given Quantum Circuit")
                 self.resultingHistgram = plt
-            if(self.results != None and self.settings.backend == "FeynmanSimulation"):
+            if(hasResults and self.settings.backend == "FeynmanSimulation"):
                 fig = plt.figure(figsize = (20, 5))
                 xVal = []
                 yVal = []
@@ -223,7 +229,7 @@ class Designer:
                 plt.xticks(rotation = rotationAmount)
                 plt.title("Probability Distribution of Given Quantum Circuit")
                 self.histogramResult = plt
-            if(self.results != None and self.settings.backend == "DWaveSimulation"):
+            if(hasResults and self.settings.backend == "DWaveSimulation"):
                 valuesFound = []
                 for energy, in self.results.data(fields=['energy']):
                     valuesFound.append(energy)
