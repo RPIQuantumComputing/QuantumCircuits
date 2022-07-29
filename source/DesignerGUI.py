@@ -107,36 +107,34 @@ def inital(row, col):
         if(row == 0 and col == 1):
             return "PZ"
         if(row == 0 and col == 2):
-            return "PX"
-        if(row == 0 and col == 3):
             return "PS"
-        if(row == 1 and col == 0):
+        if(row == 0 and col == 3):
             return "PS2"
-        if(row == 1 and col == 1):
+        if(row == 1 and col == 0):
             return "PMZ"
-        if(row == 1 and col == 2):
+        if(row == 1 and col == 1):
             return "PCX"
-        if(row == 1 and col == 3):
+        if(row == 1 and col == 2):
             return "PD"
-        if(row == 2 and col == 0):
+        if(row == 1 and col == 3):
             return "PF"
-        if(row == 2 and col == 1):
+        if(row == 2 and col == 0):
             return "PBS"
-        if(row == 2 and col == 2):
+        if(row == 2 and col == 1):
             return "PCK"
-        if(row == 2 and col == 3):
+        if(row == 2 and col == 2):
             return "PPC"
-        if(row == 3 and col == 0):
+        if(row == 2 and col == 3):
             return "PPF"
-        if(row == 3 and col == 1):
+        if(row == 3 and col == 0):
             return "PPV"
-        if(row == 3 and col == 2):
+        if(row == 3 and col == 1):
             if(len(customGates) != 0):
                 return list(customGates.keys())[0]
-        if(row == 3 and col == 3):
+        if(row == 3 and col == 2):
             if(len(customGates) > 1):
                 return list(customGates.keys())[1]
-        if(row == 4 and col == 0):
+        if(row == 3 and col == 3):
             if(len(customGates) > 2):
                 return list(customGates.keys())[2]
     return " "
@@ -398,9 +396,15 @@ class Window(QMainWindow):
             self.dwave_tab.close()           
         self.close()
         for f in undoStack:
-            os.remove(f)
+            try:
+                os.remove(f)
+            except:
+                pass
         for f in redoStack:
-            os.remove(f)
+            try:
+                os.remove(f)
+            except:
+                pass
 
     def changeStyle(self, styleName):
         QApplication.setStyle(QStyleFactory.create(styleName))
