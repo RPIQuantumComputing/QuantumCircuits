@@ -568,7 +568,7 @@ class Window(QMainWindow):
             global currentWidth
             global currentHeight
             photonicMode = not photonicMode
-            offSetHorizontal = 5
+            offSetHorizontal = 5 if photonicMode else 3
             grid = [["-" for i in range(currentWidth + offSetHorizontal)] for j in range(currentHeight)]
             global needToUpdate
             needToUpdate = False
