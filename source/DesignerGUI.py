@@ -245,6 +245,8 @@ def changeIncresim(checked):
     print("Set incremental simulation to " + str(checked))
 def updateNumQubit(val):
     designer.settings.num_qubits = val
+    global currentHeight
+    currentHeight = val
     print("Set number of qubits to " + str(val))
 
 # This is a less forceful update that changes whenever the GUI is interacted with
@@ -257,6 +259,8 @@ def updateGrid():
 # Changes Width of Quantum Circuit
 def updateNumWidth(val):
     designer.settings.num_width = val
+    global currentWidth
+    currentWidth = val
     print("Set width to " + str(val))
 
 #the main window for display
@@ -568,7 +572,7 @@ class Window(QMainWindow):
             global currentWidth
             global currentHeight
             photonicMode = not photonicMode
-            offSetHorizontal = 5 if photonicMode else 3
+            offSetHorizontal = 5
             grid = [["-" for i in range(currentWidth + offSetHorizontal)] for j in range(currentHeight)]
             global needToUpdate
             needToUpdate = False
