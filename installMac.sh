@@ -1,7 +1,7 @@
 #!/bin/sh
 sudo apt install -y python3-pip
-wget http://repo.continuum.io/archive/Anaconda3-4.0.0-Linux-x86_64.sh
-bash Anaconda3-4.0.0-Linux-x86_64.sh
+wget http://repo.continuum.io/archive/Anaconda3-4.0.0-MacOSX-x86_64.sh
+bash Anaconda3-4.0.0-MacOSX-x86_64.sh
 conda create -y -n quantumCircuits anaconda python=3.8.5
 conda activate quantumCircuits
 pip install -U --user cuda-python
