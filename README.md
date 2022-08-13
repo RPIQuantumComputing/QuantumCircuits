@@ -13,4 +13,4 @@ Current Feature Set:
   7) Allows QUBO specification to be run on DWave's Quantum Annealer
   8) Recommends modifications to Standard Gate-Model quantum computing circuits
   9) Allows emailing of your quantum circuit
-  10) Provides the user an ability to make their own custom gates
+  10) Provides the user an ability to make their own custom gates [ Removed Buggy, Will add later ]
