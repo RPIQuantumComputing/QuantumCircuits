@@ -640,17 +640,17 @@ class DWaveTab(QDialog):
         super(DWaveTab, self).__init__(parent=parent)
         self.layout = QVBoxLayout(self)
 
-        #basic initialization
+        # basic initialization
         self.setWindowTitle("DWave Ocean")
         self.tabs = QTabWidget()
         self.tab_addvar = QWidget()
         self.tab_addcon = QWidget()
         self.tab_addobj = QWidget()
         self.submit_but = QPushButton()
-        self.submit_but.setText("submit!")
+        self.submit_but.setText("submit")
         self.submit_but.clicked.connect(lambda: self.submit())
 
-        #add two tabs, one for varaible, one for constraints
+        # add two tabs, one for varaible, one for constraints
         self.tabs.addTab(self.tab_addvar, "Add Variable")
         self.tabs.addTab(self.tab_addcon, "Add Constraints")
         self.tabs.addTab(self.tab_addobj, "Set Objective")
@@ -679,7 +679,7 @@ class DWaveTab(QDialog):
         self.setLayout(self.layout)
         self.resize(800, 600)
 
-    #override close event to update the text we got from user when tab is closed
+    # override close event to update the text we got from user when tab is closed
     def closeEvent(self, event):
         global DWaveVar
         global DWaveCon
@@ -688,7 +688,7 @@ class DWaveTab(QDialog):
         DWaveCon = self.dwave_con.toPlainText()
         DwaveObjective = self.dwave_obj.text()
         self.close()
-        
+
     def submit(self):
         global DWaveVar
         global DWaveCon
