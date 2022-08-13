@@ -14,3 +14,20 @@ Current Feature Set:
   8) Recommends modifications to Standard Gate-Model quantum computing circuits
   9) Allows emailing of your quantum circuit
   10) Provides the user an ability to make their own custom gates [ Removed Buggy, Will add later ]
+
+# Install Instructions (for x86/x64 systems) [No Requirements]
+
+Click upper right and download ".zip", open terminal in extracted directory
+Windows: 
+   - Run "bash installWindows.sh"
+   - Follow prompt instructions
+Linux:
+   - Run "./installLinux.sh"
+   - Follow prompt instructions
+MacOS:
+   - Run "./installMacOS.sh"
+   - Follow prompt instructions
+
+# Running Instructions
+
+Open terminal in extracted directory, type "conda env quantumCircuits," and type "python ./source/DesignerGUI.py" to run Application
