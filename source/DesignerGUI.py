@@ -288,16 +288,12 @@ class Window(QMainWindow):
         button_custom_gate = QAction("&Custom Gate Creation", self)
         menu.addAction(button_custom_gate)
         #self.custom_gate_tab = CustomGateTab(self)
-        button_custom_gate.triggered.connect(lambda: self.makeCustomGate())
+        #button_custom_gate.triggered.connect(lambda: self.makeCustomGate())
 
         #intialize dwave tab for user input
         self.dwave_tab = DWaveTab(self)
         button_dwave.triggered.connect(lambda: self.showDWaveTab())
         #other menu bars
-        button_qiskit = QMenu("&Qiskit", self)
-        menu.addMenu(button_qiskit)
-        button_xanadu = QMenu("&IBM Xanadu", self)
-        menu.addMenu(button_xanadu)
         button_exit = QAction("&Exit", self)
         menu.addAction(button_exit)
         #additional exit button (why not)
