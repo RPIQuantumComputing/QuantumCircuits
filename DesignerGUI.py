@@ -245,8 +245,6 @@ def changeIncresim(checked):
     print("Set incremental simulation to " + str(checked))
 def updateNumQubit(val):
     designer.settings.num_qubits = val
-    global currentHeight
-    currentHeight = val
     print("Set number of qubits to " + str(val))
 
 # This is a less forceful update that changes whenever the GUI is interacted with
@@ -259,8 +257,6 @@ def updateGrid():
 # Changes Width of Quantum Circuit
 def updateNumWidth(val):
     designer.settings.num_width = val
-    global currentWidth
-    currentWidth = val
     print("Set width to " + str(val))
 
 #the main window for display
@@ -288,12 +284,16 @@ class Window(QMainWindow):
         button_custom_gate = QAction("&Custom Gate Creation", self)
         menu.addAction(button_custom_gate)
         #self.custom_gate_tab = CustomGateTab(self)
-        #button_custom_gate.triggered.connect(lambda: self.makeCustomGate())
+        button_custom_gate.triggered.connect(lambda: self.makeCustomGate())
 
         #intialize dwave tab for user input
         self.dwave_tab = DWaveTab(self)
         button_dwave.triggered.connect(lambda: self.showDWaveTab())
         #other menu bars
+        button_qiskit = QMenu("&Qiskit", self)
+        menu.addMenu(button_qiskit)
+        button_xanadu = QMenu("&IBM Xanadu", self)
+        menu.addMenu(button_xanadu)
         button_exit = QAction("&Exit", self)
         menu.addAction(button_exit)
         #additional exit button (why not)
@@ -647,7 +647,7 @@ class DWaveTab(QDialog):
         self.tab_addcon = QWidget()
         self.tab_addobj = QWidget()
         self.submit_but = QPushButton()
-        self.submit_but.setText("submit!")
+        self.submit_but.setText("submit")
         self.submit_but.clicked.connect(lambda: self.submit())
 
         #add two tabs, one for varaible, one for constraints
