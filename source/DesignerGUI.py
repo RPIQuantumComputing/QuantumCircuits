@@ -646,6 +646,9 @@ class DWaveTab(QDialog):
         self.tab_addvar = QWidget()
         self.tab_addcon = QWidget()
         self.tab_addobj = QWidget()
+        self.submit_but = QPushButton()
+        self.submit_but.setText("submit!")
+        self.submit_but.clicked.connect(lambda: self.submit())
 
         #add two tabs, one for varaible, one for constraints
         self.tabs.addTab(self.tab_addvar, "Add Variable")
@@ -672,11 +675,21 @@ class DWaveTab(QDialog):
         self.tab_addobj.setLayout(self.tab_addobj.layout)
 
         self.layout.addWidget(self.tabs)
+        self.layout.addWidget(self.submit_but)
         self.setLayout(self.layout)
         self.resize(800, 600)
 
     #override close event to update the text we got from user when tab is closed
     def closeEvent(self, event):
+        global DWaveVar
+        global DWaveCon
+        global DwaveObjective
+        DWaveVar = self.dwave_var.toPlainText()
+        DWaveCon = self.dwave_con.toPlainText()
+        DwaveObjective = self.dwave_obj.text()
+        self.close()
+        
+    def submit(self):
         global DWaveVar
         global DWaveCon
         global DwaveObjective
