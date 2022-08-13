@@ -18,15 +18,10 @@ Current Feature Set:
 # Install Instructions (for x86/x64 systems) [No Requirements]
 
 Click upper right and download ".zip", open terminal in extracted directory
-Windows: 
-   - Run "bash installWindows.sh"
-   - Follow prompt instructions
-Linux:
-   - Run "./installLinux.sh"
-   - Follow prompt instructions
-MacOS:
-   - Run "./installMacOS.sh"
-   - Follow prompt instructions
+
+Windows: Run "bash installWindows.sh" and follow prompt instructions
+Linux: Run "./installLinux.sh" and follow prompt instructions
+MacOS: Run "./installMacOS.sh" and follow prompt instructions
 
 # Running Instructions
 
