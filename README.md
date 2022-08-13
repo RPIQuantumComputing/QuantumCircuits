@@ -20,7 +20,9 @@ Current Feature Set:
 Click upper right and download ".zip", open terminal in extracted directory
 
 Windows: Run "bash installWindows.sh" and follow prompt instructions
+
 Linux: Run "./installLinux.sh" and follow prompt instructions
+
 MacOS: Run "./installMacOS.sh" and follow prompt instructions
 
 # Running Instructions
