@@ -528,7 +528,7 @@ class Window(QMainWindow):
 
         # Simulation selection panel
         Simulation = QLabel("Simulation Technique")
-        sim_selection = ["Hamiltionian", "Feynman", "DWave Ocean", "Qiskit", "IBM", "Xanadu"]
+        sim_selection = ["Hamiltionian", "Feynman", "DWave Ocean", "Qiskit", "Xanadu"]
         self.sim_box = QComboBox()
         self.sim_box.addItems(sim_selection)
         self.sim_box.currentIndexChanged.connect(self.updateSimulationTechnique)
