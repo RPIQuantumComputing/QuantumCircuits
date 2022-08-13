@@ -1,4 +1,4 @@
-curl http://repo.continuum.io/archive/Anaconda3-4.0.0-Windows-x86_64.exe -o temp.exe
+curl -L http://repo.continuum.io/archive/Anaconda3-4.0.0-Windows-x86_64.exe -o temp.exe
 temp.exe
 conda create -y -n quantumCircuits anaconda python=3.8.5
 conda activate quantumCircuits
