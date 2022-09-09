@@ -28,3 +28,5 @@ MacOS: Run "./installMacOS.sh" and follow prompt instructions
 # Running Instructions
 
 Open terminal in extracted directory, type "conda env quantumCircuits," and type "python ./source/DesignerGUI.py" to run Application
+
+If you would like to join the RCOS project, https://discord.gg/hNAezZgJDk
