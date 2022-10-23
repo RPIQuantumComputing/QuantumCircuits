@@ -1,4 +1,9 @@
-grid = [["H", "H", "S", "-", "-"], ["CNOT", "*", "CCX", "*", "*"], ["CCX", "*", "*", "S", "-"], ["S", "-", "-", "-", "-"]]
+#grid = [["H", "H", "S", "-", "-"], ["CNOT", "*", "-", "-", "-"], ["-", "CNOT", "*", "-", "-"],
+#        ["CNOT", "*", "CCX", "*", "*"], ["CCX", "*", "*", "S", "-"], ["S", "-", "-", "-", "-"]]
+grid = [["H", "H", "H", "H"], ["CX", "*", "X(1/2)", "T"], ["X(1/2)", "CX", "*", "Y(1/2)"], ["T", "X(1/2)", "CX", "*"], ["CX", "-", "-", "*"], ["H", "H", "H", "H"]]
+# ["CX", "*", "-", "-"], ["-", "CX", "*", "-"], 
+#        ["-", "-", "CX", "*"],
+#grid = [["CX", "-", "-", "*"]]
 # grid[col][row]
 
 # LL(1) Grammar to parse grid implemented using recursive descent
@@ -8,8 +13,9 @@ grid = [["H", "H", "S", "-", "-"], ["CNOT", "*", "CCX", "*", "*"], ["CCX", "*", 
 # W(n, m, k) := idS          | *              | idC(k1)
 #               W(n, m-1, k) | W(n, m-1, k-1) | W(n, m-1, k1)
 
-idS = {"H", "S", "-"}
-idC = {"CNOT": 1, "CCX": 2}
+idS = {"H", "S", "T", "X(1/2)", "Y(1/2)", "-"}
+idC = {"CNOT": 1, "CCX": 2, "CX": 1}
+idI = {"CX": 1}
 parsingFlag = False
 
 class Node:
@@ -49,16 +55,6 @@ class Node:
      def get_data(self):
         return self.data
         
-class Multigate:
-    def __init__(self):
-        self.actorTypes = ["Control", "Actor"]
-        self.actorMatrix = {"Control": [[1,0], [0,1]], "Actor": [[0,1],[1,0]]}
-        self.qubitAssociation = []
-    def getMatrix(qubit, actor):
-        return self.actorMatrix[(self.qubitAssociation[qubit])]
-    def addQubit(qubit, actor):
-        self.qubitAssociation[qubit] = actor
-        
 def W(grid, n, m, k, associations):
   rootNode = Node("W("+str(n)+","+str(m)+","+str(k)+")")
   global idS, idC, parsingFlag
@@ -70,6 +66,12 @@ def W(grid, n, m, k, associations):
     
   leftNode = Node((grid[n][m], m))
   middleNode = Node(("NotReal", -1))
+  if(grid[n][m] == "-"):
+    middleNode, associationsNew = W(grid, n, m+1, k, associations)
+    leftNode.add_associations(associationsNew)
+    rootNode.add_left(leftNode)
+    rootNode.add_middle(middleNode)
+    return rootNode, associations
   if(grid[n][m] in idS):
     leftNode.add_associations({m: "Actor"})
     middleNode, _ = W(grid, n, m+1, k, {m: "Actor"})
@@ -145,7 +147,7 @@ def generateParseTree(grid, n, m):
   return None
 
 def printTree(root, level=0):
-    print("  " * (2*level), root, "Associations: ", root.get_associations())
+    print("  " * (2*level), root, "Associations: ", root.get_associations(), type(root.get_data()))
     if(root.get_left() != None):
         printTree(root.get_left(), level + 1)
     if(root.get_middle() != None):
@@ -157,5 +159,4 @@ def parse(grid):
     print("----------------GENERATING PARSE TREE---------------------------")
     parseTree = generateParseTree(grid, 0, 0)
     printTree(parseTree)
-
-parse(grid)
+    return parseTree
