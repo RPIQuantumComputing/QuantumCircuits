@@ -209,7 +209,7 @@ def generateTensorNetworkGraph(computationLayers, qubit):
     G.add_node("S(" + str(i+1) + ")")
     qubitAssociations[i] = "S(" + str(i+1) + ")"
   index = 0
-  for layer in x:
+  for layer in computationLayers:
     index = index + 1
     qubitsUsed = {-10}
     for transformation in layer:
@@ -265,4 +265,3 @@ tree = parse(grid)
 layers = getComputationLayers(tree)
 G = generateTensorNetworkGraph(layers, 4)
 drawTensorNetworkGraph(G)
-
