@@ -4,7 +4,7 @@ A GUI-based Quantum Circuit Simulator
 ![alt text](https://github.com/dylansheils/QuantumCircuits/blob/main/assets/Black%20logo%20-%20no%20background.svg)
 
 Introduction: 
-   Quantum Computers represent promise in terms of physical simulation and for a handful of more general problems and represent a fundamental shift in how computation as a whole is viewed. However, when trying to learn quantum computing, one is either given the choice of an inflexible framework locked into one paradigm of quantum computation with a GUI or a flexible one with significant syntaxual overhead. In either case, building application for quantum computers are a secondary consideration to the primary goal of quantum simulation. QuantumCircuits aims to change this by giving students and professors alike access to an open-source learning software prioritizing 1) applications, 2) simplicity, 3) exposure, and 4) extendability.
+   Quantum Computers represent promise in terms of physical simulation and for a handful of more general problems. It also represents a fundamental shift in how computation as a whole is viewed. However, when trying to learn quantum computing, one is either given the choice of an inflexible framework locked into one paradigm of quantum computation with a GUI or a flexible one with significant syntaxual overhead. In either case, building application for quantum computers are a secondary consideration to the primary goal of quantum simulation. QuantumCircuits aims to change this by giving students and professors alike access to an open-source learning software prioritizing 1) applications, 2) simplicity, 3) exposure, and 4) extendability.
    
 Current Feature Set:
   1) Local CPU/GPU Hamiltonian/Feynman-like Simulation Capacities
