@@ -19,7 +19,7 @@ from pathlib import Path
 import pandas as pd
 import tempfile
 import DataDiagram
-
+import networkx as nx
 
 # Default X ignore
 ignoreX = 4
@@ -266,6 +266,11 @@ def updateNumWidth(val):
 
 def dataDiagramVisualization():
     histogram = designer.getStatistics()
+    if(type(histogram) == type(list())):
+        histogramNew = dict() 
+        for entry in histogram:
+            histogramNew[entry[0]] = entry[1]
+        histogram = histogramNew
     print("Button press for Data Diagram...")
     print(histogram)
     sumHistogram = 0
@@ -277,8 +282,23 @@ def dataDiagramVisualization():
     for entry, value in histogram.items():
         vector[0][int(entry, 2)] = value/sumHistogram
     print(vector)
-    root = DataDiagram.makeDataDiagram(vector, 0, False)
-    print(root)
+    root = DataDiagram.makeDataDiagram(vector[0], 0, False)
+    G = nx.Graph()
+    def createGraph(root, parent, G, number=0, level=0):
+        G.add_node(str(root), pos=(number, level))
+        if(str(root) != "DD"):
+            G.add_edge(str(parent), str(root), weight=root.get_amplitude())
+        print("  " * (2*level), root, "| Amplitude: ", root.get_amplitude())
+        if(root.get_left() != None):
+            createGraph(root.get_left(), root, G,  1+number, level + 1)
+        if(root.get_right() != None):
+            createGraph(root.get_right(), root, G, 2+number, level + 1)
+    createGraph(root, root, G)
+    pos=nx.get_node_attributes(G,'pos')
+    nx.draw(G,pos,with_labels=True)
+    labels = nx.get_edge_attributes(G,'weight')
+    nx.draw_networkx_edge_labels(G,pos,edge_labels=labels)
+    plt.show()
 
 #the main window for display
 class Window(QMainWindow):

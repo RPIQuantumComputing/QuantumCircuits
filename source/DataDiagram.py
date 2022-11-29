@@ -132,7 +132,7 @@ def constructData(root, vector, history, approximation, qubits):
         root.set_data(str(leftNode.get_data()))
         root.add_left(None)
     else:
-        if((root.get_right() == None and root.get_left() == None) or (getProbability(root.get_right().get_amplitude()) < approximation/qubits) and 
+        if((root.get_right() == None and root.get_left() == None) or (root.get_right() != None and getProbability(root.get_right().get_amplitude()) < approximation/qubits) and 
            getProbability(root.get_left().get_amplitude()) <= approximation/qubits):
           root.set_data(None)
           return False
