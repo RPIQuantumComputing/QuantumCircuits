@@ -144,6 +144,10 @@ class Designer:
     def getVisualization(self):
         return self.resultingHistgram
 
+    # Return back found result
+    def getStatistics(self):
+        return self.result
+
     # Allows one to set the backend being used
     def setBackend(self, name):
         self.settings.backend = name

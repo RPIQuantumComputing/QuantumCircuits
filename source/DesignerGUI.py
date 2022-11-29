@@ -14,10 +14,11 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 import DesignerFile
 from redmail import EmailSender
 from redmail import outlook
-
+import numpy as np
 from pathlib import Path
 import pandas as pd
 import tempfile
+import DataDiagram
 
 
 # Default X ignore
@@ -263,6 +264,22 @@ def updateNumWidth(val):
     currentWidth = val
     print("Set width to " + str(val))
 
+def dataDiagramVisualization():
+    histogram = designer.getStatistics()
+    print("Button press for Data Diagram...")
+    print(histogram)
+    sumHistogram = 0
+    lastEntry = ""
+    for entry, value in histogram.items():
+        sumHistogram += value
+        lastEntry = entry
+    vector = np.zeros((1, 2**len(entry)))
+    for entry, value in histogram.items():
+        vector[0][int(entry, 2)] = value/sumHistogram
+    print(vector)
+    root = DataDiagram.makeDataDiagram(vector, 0, False)
+    print(root)
+
 #the main window for display
 class Window(QMainWindow):
     def __init__(self, parent=None):
@@ -415,12 +432,16 @@ class Window(QMainWindow):
 
     #create interface for running simulation
     def createSimulationRunning(self):
-        self.SimulationChoice = QGroupBox("Running Simulation")
+        self.SimulationChoice = QGroupBox("Simulation Actions")
         button1 = QPushButton()
         button1.setText("Run")
         button1.clicked.connect(runSimulation)
+        button2 = QPushButton()
+        button2.setText("Data Diagram")
+        button2.clicked.connect(dataDiagramVisualization)
         layout = QVBoxLayout()
         layout.addWidget(button1)
+        layout.addWidget(button2)
         layout.addStretch(1)
         self.SimulationChoice.setLayout(layout)
 
@@ -820,6 +841,7 @@ class IndicSelectWindow(QDialog):
             self.gridLayout.addLayout(Box, 0, 6)
             self.gridLayout.setColumnStretch(6, 1)
             self.gridLayout.setRowStretch(0, 1)
+
     # If moving the mouse, bring the element with you
     def mouseMoveEvent(self, event):
         if event.buttons() & Qt.LeftButton and self.target is not None:
