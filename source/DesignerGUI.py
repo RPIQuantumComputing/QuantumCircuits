@@ -284,15 +284,32 @@ def dataDiagramVisualization():
     print(vector)
     root = DataDiagram.makeDataDiagram(vector[0], 0, False)
     G = nx.Graph()
-    def createGraph(root, parent, G, number=0, level=0):
-        G.add_node(str(root), pos=(number, level))
+    def followSelf(root, prior):
+        finalValue = prior
+        while((root.get_left() != None and str(root) == str(root.get_left())) or (root.get_right() != None and str(root) == str(root.get_right()))):
+            if(root.get_left() != None and str(root) == str(root.get_left())):
+                finalValue = root.get_left().get_amplitude()
+                root = root.get_left()
+            if(root.get_right() != None and str(root) == str(root.get_right())):
+                finalValue = root.get_right().get_amplitude()
+                root = root.get_right()
+        return finalValue
+    def createGraph(root, parent, G, index=0, level=0):
+        if(not G.has_node(str(root))):
+            G.add_node(str(root), pos=(index, -level))
         if(str(root) != "DD"):
-            G.add_edge(str(parent), str(root), weight=root.get_amplitude())
+            if(root.get_left() != None and str(root) == str(root.get_left())):
+                G.add_edge(str(parent), str(root), weight=round(followSelf(root, root.get_left().get_amplitude()),2))
+            else:
+                if(root.get_right() != None and str(root) == str(root.get_right())):
+                    G.add_edge(str(parent), str(root), weight=round(followSelf(root, root.get_right().get_amplitude()),2))
+                else:
+                    G.add_edge(str(parent), str(root), weight=round(root.get_amplitude(),2))
         print("  " * (2*level), root, "| Amplitude: ", root.get_amplitude())
         if(root.get_left() != None):
-            createGraph(root.get_left(), root, G,  1+number, level + 1)
+            createGraph(root.get_left(), root, G, (2*index+1), level + 1)
         if(root.get_right() != None):
-            createGraph(root.get_right(), root, G, 2+number, level + 1)
+            createGraph(root.get_right(), root, G, (2*index), level + 1)
     createGraph(root, root, G)
     pos=nx.get_node_attributes(G,'pos')
     nx.draw(G,pos,with_labels=True)
