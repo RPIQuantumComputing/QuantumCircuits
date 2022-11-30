@@ -14,11 +14,12 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 import DesignerFile
 from redmail import EmailSender
 from redmail import outlook
-
+import numpy as np
 from pathlib import Path
 import pandas as pd
 import tempfile
-
+import DataDiagram
+import networkx as nx
 
 # Default X ignore
 ignoreX = 4
@@ -263,6 +264,59 @@ def updateNumWidth(val):
     currentWidth = val
     print("Set width to " + str(val))
 
+def dataDiagramVisualization():
+    histogram = designer.getStatistics()
+    if(type(histogram) == type(list())):
+        histogramNew = dict() 
+        for entry in histogram:
+            histogramNew[entry[0]] = entry[1]
+        histogram = histogramNew
+    print("Button press for Data Diagram...")
+    print(histogram)
+    sumHistogram = 0
+    lastEntry = ""
+    for entry, value in histogram.items():
+        sumHistogram += value
+        lastEntry = entry
+    vector = np.zeros((1, 2**len(entry)))
+    for entry, value in histogram.items():
+        vector[0][int(entry, 2)] = value/sumHistogram
+    print(vector)
+    root = DataDiagram.makeDataDiagram(vector[0], 0, False)
+    G = nx.Graph()
+    def followSelf(root, prior):
+        finalValue = prior
+        while((root.get_left() != None and str(root) == str(root.get_left())) or (root.get_right() != None and str(root) == str(root.get_right()))):
+            if(root.get_left() != None and str(root) == str(root.get_left())):
+                finalValue = root.get_left().get_amplitude()
+                root = root.get_left()
+            if(root.get_right() != None and str(root) == str(root.get_right())):
+                finalValue = root.get_right().get_amplitude()
+                root = root.get_right()
+        return finalValue
+    def createGraph(root, parent, G, index=0, level=0):
+        if(not G.has_node(str(root))):
+            G.add_node(str(root), pos=(index, -level))
+        if(str(root) != "DD"):
+            if(root.get_left() != None and str(root) == str(root.get_left())):
+                G.add_edge(str(parent), str(root), weight=round(followSelf(root, root.get_left().get_amplitude()),2))
+            else:
+                if(root.get_right() != None and str(root) == str(root.get_right())):
+                    G.add_edge(str(parent), str(root), weight=round(followSelf(root, root.get_right().get_amplitude()),2))
+                else:
+                    G.add_edge(str(parent), str(root), weight=round(root.get_amplitude(),2))
+        print("  " * (2*level), root, "| Amplitude: ", root.get_amplitude())
+        if(root.get_left() != None):
+            createGraph(root.get_left(), root, G, (2*index+1), level + 1)
+        if(root.get_right() != None):
+            createGraph(root.get_right(), root, G, (2*index), level + 1)
+    createGraph(root, root, G)
+    pos=nx.get_node_attributes(G,'pos')
+    nx.draw(G,pos,with_labels=True)
+    labels = nx.get_edge_attributes(G,'weight')
+    nx.draw_networkx_edge_labels(G,pos,edge_labels=labels)
+    plt.show()
+
 #the main window for display
 class Window(QMainWindow):
     def __init__(self, parent=None):
@@ -415,12 +469,16 @@ class Window(QMainWindow):
 
     #create interface for running simulation
     def createSimulationRunning(self):
-        self.SimulationChoice = QGroupBox("Running Simulation")
+        self.SimulationChoice = QGroupBox("Simulation Actions")
         button1 = QPushButton()
         button1.setText("Run")
         button1.clicked.connect(runSimulation)
+        button2 = QPushButton()
+        button2.setText("Data Diagram")
+        button2.clicked.connect(dataDiagramVisualization)
         layout = QVBoxLayout()
         layout.addWidget(button1)
+        layout.addWidget(button2)
         layout.addStretch(1)
         self.SimulationChoice.setLayout(layout)
 
@@ -820,6 +878,7 @@ class IndicSelectWindow(QDialog):
             self.gridLayout.addLayout(Box, 0, 6)
             self.gridLayout.setColumnStretch(6, 1)
             self.gridLayout.setRowStretch(0, 1)
+
     # If moving the mouse, bring the element with you
     def mouseMoveEvent(self, event):
         if event.buttons() & Qt.LeftButton and self.target is not None:

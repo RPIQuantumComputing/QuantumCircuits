@@ -10,11 +10,6 @@ Original file is located at
 import numpy as np
 import math
 
-vector = np.random.rand(1,1024)[0] * (0.5j + 0.5)
-vector = vector / np.linalg.norm(vector)
-
-print(vector)
-
 class DataDiagram:
      def __init__(self,data):
           self.data = data
@@ -88,7 +83,8 @@ def correctNonterminalAmpltiudes(root, approximation):
       levels = levels - 1
 
 
-def correctEntries(root, level, unitCorrection):
+
+def correctEntries(root, level, unitCorrection, vector):
     if(root == None):
       return
     if(root.get_data() != None and len(root.get_data()) < int(math.log2(len(vector))) and root.get_data() != "DD"):
@@ -96,13 +92,15 @@ def correctEntries(root, level, unitCorrection):
     if(root.get_left() == None and root.get_right() == None):
       root.set_amplitude(root.get_amplitude() * unitCorrection)
     if(root.get_left() != None):
-        correctEntries(root.get_left(), level + 1, unitCorrection)
+        correctEntries(root.get_left(), level + 1, unitCorrection, vector)
     if(root.get_right() != None):
-        correctEntries(root.get_right(), level + 1, unitCorrection)
+        correctEntries(root.get_right(), level + 1, unitCorrection, vector)
+
 def countEntries(root, level=0):
     if(root == None):
       return 1
     return countEntries(root.get_left(), level + 1) + countEntries(root.get_right(), level + 1)
+    
 def getSummation(root, level=0):
     if(root == None):
       return 0
@@ -136,8 +134,7 @@ def constructData(root, vector, history, approximation, qubits):
         root.set_amplitude(leftNode.get_amplitude())
         root.set_data(str(leftNode.get_data()))
         root.add_left(None)
-    else:
-        if((root.get_right() == None and root.get_left() == None) or (getProbability(root.get_right().get_amplitude()) < approximation/qubits) and 
+        if((root.get_right() == None and root.get_left() == None) or (root.get_right() != None and getProbability(root.get_right().get_amplitude()) < approximation/qubits) and 
            getProbability(root.get_left().get_amplitude()) <= approximation/qubits):
           root.set_data(None)
           return False
@@ -145,15 +142,16 @@ def constructData(root, vector, history, approximation, qubits):
            root.set_amplitude(partialNorm)
   return (partialNorm*partialNorm > 0)
 
-def correctTree(root):
+def correctTree(root, vector):
   correction = getSummation(root, 0)
   unitCorrection = 1/(np.sqrt(correction))
-  correctEntries(root, 0, unitCorrection)
+  correctEntries(root, 0, unitCorrection, vector)
+
 def makeDataDiagram(vector, approximation, fftAllowed):
   root = DataDiagram("DD")
   qubits = math.ceil(math.log2(len(vector))) + 0.01
   constructData(root, vector, "", approximation, qubits)
-  correctTree(root)
+  correctTree(root, vector)
   correctNonterminalAmpltiudes(root, approximation)
   vector = np.fft.fft(vector)
   vector = vector/np.linalg.norm(vector)
@@ -166,60 +164,3 @@ def makeDataDiagram(vector, approximation, fftAllowed):
     prior = countEntries(root, 0)
     now = countEntries(rootFFT, 0)
     return rootFFT
-  return root
-
-root = makeDataDiagram(vector, 0.005/100, True)
-countEntries(root)
-
-print(root)
-vector = np.random.rand(1,1024)[0] * np.exp(1.j * np.random.uniform(0, 2 * np.pi, 1024))
-vector = vector / np.linalg.norm(vector)
-print(vector)
-
-exactStatevector = []
-exactDD = []
-approximateDDNoFFT = []
-approximateDDFFT = []
-exactDDFFT = []
-values = []
-for i in range(2, 22):
-  vector = np.random.rand(1,2**i)[0] * np.exp(1.j * np.random.uniform(0, 2 * np.pi, 2**i))
-  vector = vector / np.linalg.norm(vector)
-  values.append(i)
-  print("Run: ", i)
-  print("Exact...")
-  exactStatevector.append(2**i)
-  print("Exact Data Diagram...")
-  root = makeDataDiagram(vector, 0, False)
-  exactDD.append(countEntries(root))
-  print("Exact Data Diagram FFT...")
-  root = makeDataDiagram(vector, 0, True)
-  exactDDFFT.append(countEntries(root))
-  print("Approximate Data Diagram No FFT...")
-  root = makeDataDiagram(vector, 1/(2**i), False)
-  approximateDDNoFFT.append(countEntries(root))
-  print("Approximate Data Diagram FFT...")
-  root = makeDataDiagram(vector, 1/(2**i), True)
-  approximateDDFFT.append(countEntries(root))
-
-
-
-
-
-import matplotlib.pyplot as plt
-fig = plt.figure(1)	#identifies the figure 
-plt.plot(values, [exactStatevector[i]**3/5500000000 for i in range(len(exactDD))], label="Statevector")	#plot the points
-plt.plot(values, [exactDD[i]**3/5500000000 for i in range(len(exactDD))], label="Data Diagram")	#plot the points
-plt.plot(values, [exactDDFFT[i]**3/5500000000 for i in range(len(exactDD))], label="Data Diagram (FFT)")	#plot the points
-plt.plot(values, [approximateDDNoFFT[i]**3/5500000000 for i in range(len(exactDD))], label="Data Diagram (Approx.)")	#plot the points
-plt.plot(values, [approximateDDFFT[i]**3/5500000000 for i in range(len(exactDD))], label="Data Diagram (Approx., FFT)")	#plot the points
-plt.xlabel("Qubits",fontsize='13')	#adds a label in the x axis
-plt.ylabel("Estimated Runtime (s)",fontsize='13')	#adds a label in the y axis
-plt.yscale("log")
-plt.legend()
-plt.show()
-
-print(exactStatevector)
-
-print(exactDD)
-
