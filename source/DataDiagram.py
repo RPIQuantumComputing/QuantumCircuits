@@ -83,6 +83,7 @@ def correctNonterminalAmpltiudes(root, approximation):
       levels = levels - 1
 
 
+
 def correctEntries(root, level, unitCorrection, vector):
     if(root == None):
       return
@@ -94,10 +95,12 @@ def correctEntries(root, level, unitCorrection, vector):
         correctEntries(root.get_left(), level + 1, unitCorrection, vector)
     if(root.get_right() != None):
         correctEntries(root.get_right(), level + 1, unitCorrection, vector)
+
 def countEntries(root, level=0):
     if(root == None):
       return 1
     return countEntries(root.get_left(), level + 1) + countEntries(root.get_right(), level + 1)
+    
 def getSummation(root, level=0):
     if(root == None):
       return 0
@@ -131,7 +134,6 @@ def constructData(root, vector, history, approximation, qubits):
         root.set_amplitude(leftNode.get_amplitude())
         root.set_data(str(leftNode.get_data()))
         root.add_left(None)
-    else:
         if((root.get_right() == None and root.get_left() == None) or (root.get_right() != None and getProbability(root.get_right().get_amplitude()) < approximation/qubits) and 
            getProbability(root.get_left().get_amplitude()) <= approximation/qubits):
           root.set_data(None)
@@ -144,6 +146,7 @@ def correctTree(root, vector):
   correction = getSummation(root, 0)
   unitCorrection = 1/(np.sqrt(correction))
   correctEntries(root, 0, unitCorrection, vector)
+
 def makeDataDiagram(vector, approximation, fftAllowed):
   root = DataDiagram("DD")
   qubits = math.ceil(math.log2(len(vector))) + 0.01
@@ -161,4 +164,3 @@ def makeDataDiagram(vector, approximation, fftAllowed):
     prior = countEntries(root, 0)
     now = countEntries(rootFFT, 0)
     return rootFFT
-  return root
