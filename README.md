@@ -27,7 +27,7 @@ Current Feature Set:
 
 <div align="center"><img src="https://developer.nvidia.com/sites/default/files/akamai/nvidia-cuquantum-icon.svg" width="500"/></div>
 
-# Install Instructions (for Dockerization) [Requires XServer and Docker]
+# Dockerization Install [Requires XServer and Docker]
 
 Note, Dockerization is required in addition to Nvidia GPU for cuQuantum backend support, waiting on Nvidia to release the package more widely.
   1) docker run --gpus all -it -p 8905:8905 -p 8906:8906 nvcr.io/nvidia/cuquantum-appliance:22.07-cirq
