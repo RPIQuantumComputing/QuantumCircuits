@@ -13,7 +13,7 @@ grid = [["H", "H", "H", "H"], ["CX", "*", "X(1/2)", "T"], ["X(1/2)", "CX", "*", 
 # W(n, m, k) := idS          | *              | idC(k1)
 #               W(n, m-1, k) | W(n, m-1, k-1) | W(n, m-1, k1)
 
-idS = {"H", "S", "T", "X(1/2)", "Y(1/2)", "-"}
+idS = {"H", "S", "T", "X(1/2)", "Y(1/2)", "-", "M"}
 idC = {"CNOT": 1, "CCX": 2, "CX": 1}
 idI = {"CX": 1}
 parsingFlag = False
@@ -147,6 +147,8 @@ def generateParseTree(grid, n, m):
   return None
 
 def printTree(root, level=0):
+    if(root == None):
+        return
     print("  " * (2*level), root, "Associations: ", root.get_associations(), type(root.get_data()))
     if(root.get_left() != None):
         printTree(root.get_left(), level + 1)

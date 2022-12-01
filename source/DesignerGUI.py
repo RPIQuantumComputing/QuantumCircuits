@@ -19,6 +19,8 @@ from pathlib import Path
 import pandas as pd
 import tempfile
 import DataDiagram
+import ParseCircuit
+import TensorContractionGeneration
 import networkx as nx
 
 # Default X ignore
@@ -288,34 +290,82 @@ def dataDiagramVisualization():
         finalValue = prior
         while((root.get_left() != None and str(root) == str(root.get_left())) or (root.get_right() != None and str(root) == str(root.get_right()))):
             if(root.get_left() != None and str(root) == str(root.get_left())):
-                finalValue = root.get_left().get_amplitude()
+                if(finalValue > root.get_left().get_amplitude()):
+                    finalValue = root.get_left().get_amplitude()
                 root = root.get_left()
             if(root.get_right() != None and str(root) == str(root.get_right())):
-                finalValue = root.get_right().get_amplitude()
+                if(finalValue > root.get_right().get_amplitude()):
+                    finalValue = root.get_right().get_amplitude()
                 root = root.get_right()
         return finalValue
     def createGraph(root, parent, G, index=0, level=0):
+        if(root != None and root.get_amplitude() <= 0):
+            return
         if(not G.has_node(str(root))):
             G.add_node(str(root), pos=(index, -level))
         if(str(root) != "DD"):
-            if(root.get_left() != None and str(root) == str(root.get_left())):
+            if(root != None and root.get_left() != None and str(root) == str(root.get_left())):
                 G.add_edge(str(parent), str(root), weight=round(followSelf(root, root.get_left().get_amplitude()),2))
             else:
-                if(root.get_right() != None and str(root) == str(root.get_right())):
+                if(root != None and root.get_right() != None and str(root) == str(root.get_right())):
                     G.add_edge(str(parent), str(root), weight=round(followSelf(root, root.get_right().get_amplitude()),2))
                 else:
-                    G.add_edge(str(parent), str(root), weight=round(root.get_amplitude(),2))
-        print("  " * (2*level), root, "| Amplitude: ", root.get_amplitude())
-        if(root.get_left() != None):
+                    if(root != None and str(parent) != str(root)):
+                        G.add_edge(str(parent), str(root), weight=round(root.get_amplitude(),2))
+        if(root != None):
+            print("  " * (2*level), root, "| Amplitude: ", root.get_amplitude())
+        if(root != None and root.get_left() != None):
             createGraph(root.get_left(), root, G, (2*index+1), level + 1)
-        if(root.get_right() != None):
+        if(root != None and root.get_right() != None):
             createGraph(root.get_right(), root, G, (2*index), level + 1)
     createGraph(root, root, G)
     pos=nx.get_node_attributes(G,'pos')
     nx.draw(G,pos,with_labels=True)
-    labels = nx.get_edge_attributes(G,'weight')
-    nx.draw_networkx_edge_labels(G,pos,edge_labels=labels)
+    # Currently, the implementation is buggy...to say the least, works with amplitudes, just don't show the user :P
+    #labels = nx.get_edge_attributes(G,'weight')
+    #nx.draw_networkx_edge_labels(G,pos,edge_labels=labels)
     plt.show()
+    
+def showParseGrid():
+    tempGrid = [["H", "H", "S", "-", "-"], ["CNOT", "*", "-", "-", "-"], ["-", "CNOT", "*", "-", "-"], ["CNOT", "*", "CCX", "*", "*"], ["CCX", "*", "*", "S", "-"], ["S", "-", "-", "-", "-"]]
+    print("---------------------------PARSER IMPLEMENTATION IN PROGRESS-------------------------------------")
+    for entry in tempGrid:
+        print(entry)
+    print("---------------------------------LL(1) PARSER---------------------------------------------")
+    ParseCircuit.parse(tempGrid)
+    
+def showTensorNetwork():
+    gridA = [["H", "H", "S", "-", "-"], ["CNOT", "*", "-", "-", "-"], ["-", "CNOT", "*", "-", "-"],
+        ["CNOT", "*", "CCX", "*", "*"], ["CCX", "*", "*", "S", "-"], ["S", "-", "-", "-", "-"]]
+    gridB = [["H", "H", "H", "H"], ["CX", "*", "X(1/2)", "T"], ["X(1/2)", "CX", "*", "Y(1/2)"], ["T", "X(1/2)", "CX", "*"], ["CX", "-", "-", "*"], ["H", "H", "H", "H"]]
+    print("---------------------------PARSER IMPLEMENTATION IN PROGRESS-------------------------------------")
+    if(random.random() >= 0.5):
+        print("EXAMPLE NETWORK 1: (GRID A)")
+        array = np.array(gridA)
+        transposed_array = array.T
+        transposed_list_of_lists = transposed_array.tolist()
+        for entry in transposed_list_of_lists:
+            print(entry)
+        print("---------------------------------------------------")
+        tree = TensorContractionGeneration.parse(gridA)
+        layers = TensorContractionGeneration.getComputationLayers(tree)
+        G = TensorContractionGeneration.generateTensorNetworkGraph(layers, 5)
+        TensorContractionGeneration.drawTensorNetworkGraph(G)
+        plt.show()
+    else:
+        print("EXAMPLE NETWORK 2: (GRID B)")
+        array = np.array(gridB)
+        transposed_array = array.T
+        transposed_list_of_lists = transposed_array.tolist()
+        for entry in transposed_list_of_lists:
+            print(entry)
+        print("---------------------------------------------------")
+        tree = TensorContractionGeneration.parse(gridB)
+        layers = TensorContractionGeneration.getComputationLayers(tree)
+        G = TensorContractionGeneration.generateTensorNetworkGraph(layers, 4)
+        TensorContractionGeneration.drawTensorNetworkGraph(G)
+        plt.show()
+
 
 #the main window for display
 class Window(QMainWindow):
@@ -476,9 +526,17 @@ class Window(QMainWindow):
         button2 = QPushButton()
         button2.setText("Data Diagram")
         button2.clicked.connect(dataDiagramVisualization)
+        button3 = QPushButton()
+        button3.setText("LL(1) Grid Parser")
+        button3.clicked.connect(showParseGrid)
+        button4 = QPushButton()
+        button4.setText("Tensor Network Diagram")
+        button4.clicked.connect(showTensorNetwork)
         layout = QVBoxLayout()
         layout.addWidget(button1)
         layout.addWidget(button2)
+        layout.addWidget(button4)
+        layout.addWidget(button3)
         layout.addStretch(1)
         self.SimulationChoice.setLayout(layout)
 

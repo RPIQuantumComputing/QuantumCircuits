@@ -112,7 +112,7 @@ def constructData(root, vector, history, approximation, qubits):
   if(len(vector) == 1):
     root.set_data(history)
     root.set_amplitude(vector[0])
-    return (getProbability(vector[0]) > approximation/qubits)
+    return True
   leftNode = DataDiagram(history)
   rightNode = DataDiagram(history)
   middle_index = len(vector)//2
@@ -120,25 +120,8 @@ def constructData(root, vector, history, approximation, qubits):
     root.add_left(leftNode)
   if(constructData(rightNode, vector[middle_index:], history + str(1), approximation, qubits)):
      root.add_right(rightNode)
-  if(root.get_right() != None and (root.get_left() == None or getProbability(root.get_left().get_amplitude()) < approximation/qubits)
-      and root.get_data() != "DD"):
-    root.set_amplitude(rightNode.get_amplitude())
-    root.set_data(str(rightNode.get_data()))
-    root.add_right(None)
-  else:
-    if(root.get_left() != None and (root.get_right() == None or getProbability(root.get_right().get_amplitude()) < approximation/qubits)
-        and root.get_data() != "DD"):
-        root.set_amplitude(leftNode.get_amplitude())
-        root.set_data(str(leftNode.get_data()))
-        root.add_left(None)
-    else:
-        if((root.get_right() == None and root.get_left() == None) or (root.get_right() != None and getProbability(root.get_right().get_amplitude()) < approximation/qubits) and 
-           getProbability(root.get_left().get_amplitude()) <= approximation/qubits):
-          root.set_data(None)
-          return False
-        else:
-           root.set_amplitude(partialNorm)
-  return (partialNorm*partialNorm > 0)
+  root.set_amplitude(partialNorm)
+  return (partialNorm*partialNorm > approximation/qubits)
 
 def correctTree(root, vector):
   correction = getSummation(root, 0)
