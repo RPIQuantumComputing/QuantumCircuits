@@ -23,7 +23,8 @@ Current Feature Set:
   11) Visualize Data Diagram associated with circuit simulation
   12) Visualize Tensor Network associated with circuit simulation
   13) Visualize LL(1) 2D Parser to interpret QuantumCircuits!
-  
+
+<div align="center"><img src="https://developer.nvidia.com/sites/default/files/akamai/nvidia-cuquantum-icon.svg" width="500"/></div>
 # Install Instructions (for Dockerization) [Requires an XServer client like XLaunch for Windows and Docker]
 
 Note, Dockerization is required in addition to Nvidia GPU for cuQuantum backend support, waiting on Nvidia to release the package more widely.
@@ -37,7 +38,7 @@ Note, Dockerization is required in addition to Nvidia GPU for cuQuantum backend 
   8) cd source
   9) python DesignerGUI.py
 
-For deverlopers, one can access the local Jupyter notebook (development enviornment) by doing localhoast:8906/tree with Token apparing after running command #6.
+For deverlopers, one can access the local Jupyter notebook (development enviornment) by doing localhoast:8906/tree with Token appearing after running command #6.
 
 # Install Instructions (for x86/x64 systems) [No Requirements]
 
