@@ -216,6 +216,9 @@ def runSimulation():
 def changeSimulationTechniqueHamiltonian():
     designer.setBackend("HamiltionSimulation")
     print("Changed backend to Hamiltion Simulation")
+def changeSimulationTechniqueHamiltonianCuQuantum():
+    designer.setBackend("HamiltionSimulationCuQuantum")
+    print("Changed backend to Hamiltion CuQuantum Simulation")
 def changeSimulationTechniqueFeynman():
     designer.setBackend("FeynmanSimulation")
     print("Changed backend to Feynman Simulation")
@@ -299,8 +302,6 @@ def dataDiagramVisualization():
                 root = root.get_right()
         return finalValue
     def createGraph(root, parent, G, index=0, level=0):
-        if(root != None and root.get_amplitude() <= 0):
-            return
         if(not G.has_node(str(root))):
             G.add_node(str(root), pos=(index, -level))
         if(str(root) != "DD"):
@@ -315,9 +316,9 @@ def dataDiagramVisualization():
         if(root != None):
             print("  " * (2*level), root, "| Amplitude: ", root.get_amplitude())
         if(root != None and root.get_left() != None):
-            createGraph(root.get_left(), root, G, (2*index+1), level + 1)
+            createGraph(root.get_left(), root, G, (index), level + 1)
         if(root != None and root.get_right() != None):
-            createGraph(root.get_right(), root, G, (2*index), level + 1)
+            createGraph(root.get_right(), root, G, (index+1), level + 1)
     createGraph(root, root, G)
     pos=nx.get_node_attributes(G,'pos')
     nx.draw(G,pos,with_labels=True)
@@ -542,8 +543,10 @@ class Window(QMainWindow):
 
     #a function that changes setting file and backend based on user's choice
     def updateSimulationTechnique(self, i):
-        if("H" in self.sim_box.currentText()):
+        if("H" in self.sim_box.currentText() and "u" not in self.sim_box.currentText()):
             changeSimulationTechniqueHamiltonian()
+        elif("H" in self.sim_box.currentText()):
+            changeSimulationTechniqueHamiltonianCuQuantum()
         elif("F" in self.sim_box.currentText()):
             changeSimulationTechniqueFeynman()
         elif("D" in self.sim_box.currentText()):
@@ -644,7 +647,7 @@ class Window(QMainWindow):
 
         # Simulation selection panel
         Simulation = QLabel("Simulation Technique")
-        sim_selection = ["Hamiltionian", "Feynman", "DWave Ocean", "Qiskit", "Xanadu"]
+        sim_selection = ["Hamiltionian", "Hamiltonian CuQuantum", "Feynman", "DWave Ocean", "Qiskit", "Xanadu"]
         self.sim_box = QComboBox()
         self.sim_box.addItems(sim_selection)
         self.sim_box.currentIndexChanged.connect(self.updateSimulationTechnique)

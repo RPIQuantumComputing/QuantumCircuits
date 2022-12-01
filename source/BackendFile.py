@@ -230,6 +230,130 @@ class FeynmanBackend:
         plt.title("Probability Distribution of Given Quantum Circuit")
         self.histogramResult = plt
         print(self.results)
+        
+class HamiltonionCuQuantumBackend:
+    provider = "Local"
+    settings = None
+    histogramResult = None
+    results = None
+
+    def __init__(self, newSettings):
+        self.settings = newSettings
+    
+    def sendAPIToken():
+        pass
+    
+    def sendRequest(self, gridWidth, gridHeight, grid):
+        from cuquantum import contract
+        from cuquantum import CircuitToEinsum
+        # Get results, store figure, normalize, apply phase scalar map
+# Do similar decomposition process
+        circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
+        for widthIdx in range(gridWidth):
+            for heightIdx in range(gridHeight):
+                if(grid[widthIdx][heightIdx].getName() != '-'):
+                    if(grid[widthIdx][heightIdx].getName() == 'CNOT'):
+                        circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
+                        circuitOperators[widthIdx][heightIdx+1] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
+                    else:
+                        circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
+        numQubits = gridHeight
+        numDepth = gridWidth
+        # Make qiskit gate
+        circuit = QuantumCircuit(numQubits)
+        for widthIdx in range(gridWidth):
+            circuitLayer = []
+            for heightIdx in range(gridHeight):
+                if(grid[widthIdx][heightIdx].getName() != '-'):
+                    if(grid[widthIdx][heightIdx].getName() == 'H'):
+                        circuit.h(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'X'):
+                        circuit.x(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'Y'):
+                        circuit.y(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'Z'):
+                        circuit.z(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'S'):
+                        circuit.s(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'T'):
+                        circuit.t(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'CNOT'):
+                        circuit.cnot(heightIdx, heightIdx + 1)
+                        heightIdx += 1
+                        
+        myconverter = CircuitToEinsum(circuit, dtype='complex128', backend=np)
+        # Compute the probability of certain qubits being 1, i.e. specific bitstring result
+        def returnProbabilitiy(statevector, qubitsActive):
+            projectTo = np.array([1])
+            for entry in range(0, len(qubitsActive)):
+                if(qubitsActive[entry] == 1):
+                    projectTo = np.kron(projectTo, np.array([0, 1]))
+                else:
+                    projectTo = np.kron(projectTo, np.array([1, 0]))
+            projectTo = projectTo
+            projectTo = np.transpose(projectTo)
+            dotProduct = projectTo.dot(statevector)
+            return dotProduct
+        
+        def getAllPossibilities(statevector, qubits):
+            bin_str = [''.join(p) for p in itertools.product('01', repeat=qubits)]
+            possibility = [list(p) for p in itertools.product([0, 1], repeat=qubits)]
+            result = []
+            for entry in range(len(possibility)):
+                dotProduct = returnProbabilitiy(statevector, possibility[entry])
+                probability = np.real(dotProduct * np.conj(dotProduct))
+                phase = np.angle(dotProduct)
+                if(probability > 0):
+                    result.append([bin_str[entry], probability, phase])
+            return result
+        
+        # Save results
+        print("Performing Tensor Network Contraction")
+        expression, operands = myconverter.state_vector()
+        sv = contract(expression, *operands)
+        sv = sv.reshape(-1)
+        print("Statevector found by Tensor Network Contraction")
+        results = getAllPossibilities(sv, numQubits)
+        self.result = result
+        fig = plt.figure(figsize = (20, 5))
+        xVal = []
+        yVal = []
+        norm = mpl.colors.Normalize(vmin=0, vmax=np.pi)
+        cmap = cm.hsv
+        m = cm.ScalarMappable(norm=norm, cmap=cmap)
+        # Normalize to 100% (show percentages, not decimals)
+        for entry in results:
+            xVal.append(entry[0][::-1])
+            if(hasCupy):
+                yVal.append(entry[1].get()*100)
+            else:
+                yVal.append(entry[1]*100)
+        if(hasCupy):
+            phases = [m.to_rgba(tnp.angle(results[j][2].get() * 1j)) for j in range(len(results))]
+        else:
+            phases = [m.to_rgba(tnp.angle(results[j][2] * 1j)) for j in range(len(results))]
+        # Values are not sorted, do your magic pandas!
+        df = pd.DataFrame(
+            dict(
+                x=xVal,
+                y=yVal,
+                phase=phases
+            )
+        )
+
+        df_sorted = df.sort_values('x')
+        # Make graph
+        plt.bar(df_sorted['x'], df_sorted['y'], width = 0.4, color = df_sorted['phase'])
+        plt.xlabel("Computational Result")
+        plt.ylabel("Probability")
+        # Empirical formula to find rotations
+        rotationAmount = math.floor(90/(1 + np.exp(-(((len(xVal))/3)-5))))
+        plt.xticks(rotation = rotationAmount)
+        cbar = plt.colorbar(m)
+        cbar.set_label('Relative Phase of State (Radians)', rotation=-90, labelpad=20)
+        plt.title("Probability Distribution of Given Quantum Circuit")
+        self.histogramResult = plt
+        self.results = results
 
 class DWaveBackend:
     provider = "DWave"
@@ -488,6 +612,7 @@ def BackendFactory(backendType="HamiltionSimulation", settings=SettingsFile.Sett
     backendTypes = {
         "HamiltionSimulation" : HamiltonionBackend,
         "FeynmanSimulation" : FeynmanBackend,
+        "HamiltionSimulationCuQuantum": HamiltonionCuQuantumBackend,
         "DWaveSimulation" : DWaveBackend,
         "Photonic": XanaduBackend,
         "Qiskit": QiskitBackend
