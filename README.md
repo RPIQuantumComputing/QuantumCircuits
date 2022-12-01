@@ -23,6 +23,7 @@ Current Feature Set:
   11) Visualize Data Diagram associated with circuit simulation
   12) Visualize Tensor Network associated with circuit simulation
   13) Visualize LL(1) 2D Parser to interpret QuantumCircuits!
+  14) Supports cuQuantum Tensor Network simulation
 
 <div align="center"><img src="https://developer.nvidia.com/sites/default/files/akamai/nvidia-cuquantum-icon.svg" width="500"/></div>
 
