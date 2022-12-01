@@ -23,6 +23,21 @@ Current Feature Set:
   11) Visualize Data Diagram associated with circuit simulation
   12) Visualize Tensor Network associated with circuit simulation
   13) Visualize LL(1) 2D Parser to interpret QuantumCircuits!
+  
+# Install Instructions (for Dockerization) [Requires an XServer client like XLaunch for Windows and Docker]
+
+Note, Dockerization is required in addition to Nvidia GPU for cuQuantum backend support, waiting on Nvidia to release the package more widely.
+  1) docker run --gpus all -it -p 8905:8905 -p 8906:8906 nvcr.io/nvidia/cuquantum-appliance:22.07-cirq
+  2) pip install jupyter qiskit pyqt5
+  3) git clone https://github.com/dylansheils/QuantumCircuits.git
+  4) apt-get update && apt-get install libgl1 redmail
+  5) apt-get install '^libxcb.*-dev' libx11-xcb-dev libglu1-mesa-dev libxrender-dev libxi-dev libxkbcommon-dev libxkbcommon-x11-dev
+  6) jupyter notebook --port=8905 --no-browser --ip=0.0.0.0 --allow-root
+  7) cd QuantumCircuits
+  8) cd source
+  9) python DesignerGUI.py
+
+For deverlopers, one can access the local Jupyter notebook (development enviornment) by doing localhoast:8906/tree with Token apparing after running command #6.
 
 # Install Instructions (for x86/x64 systems) [No Requirements]
 
