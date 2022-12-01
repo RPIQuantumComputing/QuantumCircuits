@@ -20,7 +20,9 @@ Current Feature Set:
   8) Recommends modifications to Standard Gate-Model quantum computing circuits
   9) Allows emailing of your quantum circuit
   10) Provides the user an ability to make their own custom gates [ Removed Buggy, Will add later ]
-  11) Visualize Data Diagram associated with statevector simulation
+  11) Visualize Data Diagram associated with circuit simulation
+  12) Visualize Tensor Network associated with circuit simulation
+  13) Visualize LL(1) 2D Parser to interpret QuantumCircuits!
 
 # Install Instructions (for x86/x64 systems) [No Requirements]
 
