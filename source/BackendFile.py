@@ -25,7 +25,9 @@ import pandas as pd
 from scipy.optimize import minimize
 from qiskit import QuantumCircuit
 from qiskit import Aer, transpile
+import qiskit
 from qiskit.tools.visualization import plot_histogram, plot_state_city
+from qiskit.providers.aer.library import save_statevector
 import qiskit.quantum_info as qi
 
 class HamiltonionBackend:
@@ -41,7 +43,8 @@ class HamiltonionBackend:
         pass
     
     def sendRequest(self, gridWidth, gridHeight, grid):
-        # Extract underlying grid information
+        # Get results, store figure, normalize, apply phase scalar map
+# Do similar decomposition process
         circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
         for widthIdx in range(gridWidth):
             for heightIdx in range(gridHeight):
@@ -53,253 +56,63 @@ class HamiltonionBackend:
                         circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
         numQubits = gridHeight
         numDepth = gridWidth
-        # Store operations with associated matrix result
-        operations = {'H': [np.array([[1/np.sqrt(2) + 0.0j, 1/np.sqrt(2) + 0.0j], [1/np.sqrt(2) + 0.0j, -1/np.sqrt(2) + 0.0j]]),1], '-': [np.array([[1, 0], [0,1]]),1],
-             'CNOT': [np.array([[1+ 0.0j,0+ 0.0j,0+ 0.0j,0+ 0.0j],[0+ 0.0j,1+ 0.0j,0+ 0.0j,0+ 0.0j],[0+ 0.0j,0+ 0.0j,0+ 0.0j,1+ 0.0j],[0+ 0.0j,0+ 0.0j,1+ 0.0j,0+ 0.0j]]), 2], 'X': [np.array([[0 + 0.0j, 1+ 0.0j],[1+ 0.0j,0+ 0.0j]]),1], 'Y': [np.array([[0+ 0.0j, 0-1j],[0+1j, 0+ 0.0j]]), 1],
-             'Z': [np.array([[1+ 0.0j, 0+ 0.0j],[0+ 0.0j,-1+ 0.0j]]), 1], 'S': [np.array([[1+ 0.0j,0+ 0.0j],[0+ 0.0j,0+1j]]), 1], 'T': [np.array([[1+ 0.0j,0+ 0.0j],[0+ 0.0j,0+tnp.exp(1j*np.pi/4)]]),1]}
-
-        # Store current index of qubit, involved qubits for each index, and current state vector decomposition
-        qubitToIndex = [j for j in range(numQubits)]
-        qubitsInvolvedInIndex = [[j] for j in range(numQubits)]
-        decomposedState = [np.transpose(np.array([1+ 0.0j,0 + 0.0j])) for i in range(numQubits)]
-
-        # Code from Matthew Johnson @ Google Brain to solve nearest kronacker product problem
-        # Find gram matrix decomposition
-        def gram_matrix(Xs):
-            temp = tnp.vstack([tnp.ravel(X) for X in Xs],dtype=complex)
-            return tnp.dot(temp, temp.T)
-
-        # Return eigenvalues
-        def eig(X):
-            vals, vecs = np.linalg.eig(X)
-            idx = tnp.argsort(tnp.abs(vals))
-            return vals[idx], vecs[...,idx]
-
-        # Return eigenvalue for both transpose and nontranspose
-        def eig_both(X):
-            return eig(X.T)[1], eig(X)[1]
-
-        # Find the nearest product sum
-        def nkp_sum(As, Bs):
-            GK = tnp.dot(gram_matrix(As), gram_matrix(Bs))
-            lvecs, rvecs = eig_both(GK)
-            Ahat = tnp.einsum('i,ijk->jk', lvecs[-1], As)
-            Bhat = tnp.einsum('i,ijk->jk', rvecs[-1], Bs)
-            return Ahat.reshape(As[0].shape), Bhat.reshape(Bs[0].shape)
-
-        def nkp(A, Bshape):
-            # Perform block decomposition
-            blocks = map(lambda blockcol: tnp.split(blockcol*(1.0 + 0.0j), Bshape[0], 0),
-                                tnp.split(A.get()*(1.0 + 0.0j), Bshape[1], 1))
-           # Default imposed decomposition
-            Atilde = tnp.vstack([block.ravel()*(1.0 + 0.0j) for blockcol in blocks
-                                    for block in blockcol])
-            # Perform decomposition
-            U, s, V = tnp.linalg.svd(Atilde)
-            Cshape = A.shape[0] // Bshape[0], A.shape[1] // Bshape[1]
-            idx = tnp.argmax(s)
-            B = tnp.sqrt(s[idx]) * U[:,idx].reshape(Bshape).T
-            C = tnp.sqrt(s[idx]) * V[idx,:].reshape(Cshape)
-            return B, C
-        # Specific to this implementation, accounts for complex nearest kronacker product problem
-        def performDecomp(matrixInput, matricies):
-            if(np.shape(matrixInput)[0] < 4):
-                matricies.append(matrixInput)
-                return
-            matrix = np.column_stack((matrixInput.real,matrixInput.imag,np.zeros(np.shape(matrixInput)[0]),np.zeros(np.shape(matrixInput)[0])))
-            a, b = nkp(matrix, (2**math.floor(math.log2(np.shape(matrix)[1])/2), 2))
-            a = a[:,0] + a[:,1]*(1.0j)
-            b = b[:,0] + b[:,1]*(1.0j)
-            matricies.append(a)
-            performDecomp(b, matricies)
-            return
-
-        # Gives the kronacker decomposition found
-        def findDecomposition(matrix):
-            matricies = []
-            performDecomp(matrix, matricies)
-            matricies = np.array(matricies)
-            return matricies
-
-        # Allow for finding qubits involved in amtrix
-        def findNumQubits(matrix):
-            return matrix.shape()
-
-        # Gives tensor corresponding to specific depth
-        def getTensor(depth):
-            initalTensor = np.array([1])
-            index = 0
-            for entry in circuitOperators[depth]:
-                if(min(entry[1]) == index):
-                    initalTensor = np.kron(initalTensor, operations[entry[0]][0])
-                index += 1
-            return initalTensor
-
-        # Store probabilities, assume inital statevector of zero
-        stateProbabilities = []
-        initalState = np.zeros(numQubits)
-        initalState[0] = 1
-        # Trick to get 2^n statevector from short string
-        history = ["".join(seq) for seq in itertools.product("01", repeat=numQubits)]
-        arrayHistory = [(np.fromstring(entry,'u1') - ord('0'))*(1.0+0.0j) for entry in history]
-        for qubit in range(numQubits):
-            probabilityTotal = 0.0
-        for possiblePrior in arrayHistory:
-            pass
-
-        # For circuit depth and qubit amount
-        for depthCurrent in range(numDepth):
-            for qubit in range(numQubits):
-                numActors = operations[circuitOperators[depthCurrent][qubit][0]][1]
-                matrix = operations[circuitOperators[depthCurrent][qubit][0]][0]
-                if(circuitOperators[depthCurrent][qubit][0] != '-'):
-                    indexToCombined = min(circuitOperators[depthCurrent][qubit][1])
-                    if(2**numActors == np.shape(decomposedState[qubitToIndex[qubit]])[0]):
-                        # Single gate, easy peasy lemon squezze, just get matrix and dot it
-                        matrix = operations[circuitOperators[depthCurrent][qubit][0]][0]
-                        decomposedState[qubitToIndex[qubit]] = matrix.dot(decomposedState[qubitToIndex[qubit]])
-                    else:
-                        # Find current state vector, get effective application matrix
-                        tempStateVec = np.array([1])
-                        applyMatrix = np.array([1])
-                        tempAppliedMembers = 0
-                        newQubitsInvolved = []
-                        # For qubits involved in interaction
-                        for actorQubit in circuitOperators[depthCurrent][qubit][1]:
-                            # Kronacker relevant state vectors
-                            tempStateVec = np.kron(tempStateVec, decomposedState[qubitToIndex[actorQubit]])
-                            for entry in qubitsInvolvedInIndex[qubitToIndex[actorQubit]]:
-                                # Append the qubits involved, create entangled state
-                                newQubitsInvolved.append(entry)
-                                qubitToIndex[entry] = qubitToIndex[qubit]
-                                qubitsInvolvedInIndex[entry] = [-1]
-                                decomposedState[entry] = np.array([])
-                                if(entry not in circuitOperators[depthCurrent][qubit][1]):
-                                    applyMatrix = np.kron(applyMatrix, np.array([[1,0],[0,1]]))
-                                else:
-                                    if(tempAppliedMembers != numActors):
-                                        applyMatrix = np.kron(applyMatrix, matrix)
-                                        tempAppliedMembers += numActors
-                        # Apply effective matrix
-                        qubitsInvolvedInIndex[qubitToIndex[qubit]] = newQubitsInvolved
-                        decomposedState[qubitToIndex[qubit]] = applyMatrix.dot(tempStateVec)
-        # Resolves empty positions and indexing errors
-        temp = []
-        for entry in decomposedState:
-            if(np.shape(entry)[0] > 0):
-                temp.append(entry)
-        decomposedState = temp
-        temp = []
-        tempIndex = 0
-        for entry in qubitsInvolvedInIndex:
-            if(np.shape(entry)[0] > 0 and entry[0] != -1):
-                temp.append(entry)
-        else:
-            if(np.shape(entry)[0] > 0):
-                for idx in range(tempIndex, len(qubitToIndex)):
-                    qubitToIndex[idx] -= 1
-        tempIndex += 1
-        qubitsInvolvedInIndex = temp
-        temp = []
-
-        # Short code to help replace string position
-        def replace(string, index, newString):
-            s = string[:index] + newString + string[index + 1:]
-            return s
-
-        # Gets weighted probability based on statevector
-        def getWeightedProbabilities(saveResults):
-            initalString = "0"*numQubits
-            shotNum = 2**10
-            phase = 0
-            results = {}
-            resultsPhases = {}
-            currentShot = 0
-            while(currentShot < shotNum): # For number of samples
-                for decision in range(len(decomposedState)):
-                    numVal = len(decomposedState[decision]) # Add decision
-                if(hasCupy):
-                    currentArray = decomposedState[decision].get() # Get probabilities
+        # Make qiskit gate
+        circuit = QuantumCircuit(numQubits)
+        for widthIdx in range(gridWidth):
+            circuitLayer = []
+            for heightIdx in range(gridHeight):
+                if(grid[widthIdx][heightIdx].getName() != '-'):
+                    if(grid[widthIdx][heightIdx].getName() == 'H'):
+                        circuit.h(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'X'):
+                        circuit.x(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'Y'):
+                        circuit.y(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'Z'):
+                        circuit.z(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'S'):
+                        circuit.s(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'T'):
+                        circuit.t(heightIdx)
+                    if(grid[widthIdx][heightIdx].getName() == 'CNOT'):
+                        circuit.cnot(heightIdx, heightIdx + 1)
+                        heightIdx += 1
+        circuit.save_statevector()
+        # Compute the probability of certain qubits being 1, i.e. specific bitstring result
+        def returnProbabilitiy(statevector, qubitsActive):
+            projectTo = np.array([1])
+            for entry in range(0, len(qubitsActive)):
+                if(qubitsActive[entry] == 1):
+                    projectTo = np.kron(projectTo, np.array([0, 1]))
                 else:
-                    currentArray = decomposedState[decision]
-                probabilities = tnp.zeros((numVal,))
-                for index in range(numVal):
-                    dotWith = tnp.zeros((numVal,))
-                    dotWith[index] = 1.0
-                    dotWith = tnp.dot(dotWith, currentArray[index])
-                    probabilities[index] = tnp.real(tnp.conj(dotWith).dot(dotWith)) # Perform normalization on statevector
-                probabilities = [element/tnp.sum(probabilities) for element in probabilities]
-                # Get binary representation and choose values for state decomposition
-                pickedPossibility = tnp.random.choice(len(currentArray), p=probabilities)
-                s = bin(pickedPossibility)
-                stringToParse = "0"*(len(qubitsInvolvedInIndex[decision]) - len(s[2:])) + s[2:]
-                # Add to phase
-                phase += decomposedState[decision][pickedPossibility]
-                index = 0
-                for char in stringToParse:
-                    # Store choice to string
-                    if(index < len(qubitsInvolvedInIndex[decision])):
-                        truePosition = qubitsInvolvedInIndex[decision][index]
-                        initalString = initalString[:truePosition] + char + initalString[truePosition + 1:]
-                        index += 1
-                    else:
-                        break
-                if(initalString not in results):
-                    results[initalString] = 1
-                else:
-                    results[initalString] += 1
-                resultsPhases[initalString] = phase
-                initalString = "0"*numQubits
-                phase = 0
-                currentShot += 1
-                # Save results and add to current shot
-                for element in results.keys():
-                    saveResults.append([element, results[element]/shotNum, resultsPhases[element]])
+                    projectTo = np.kron(projectTo, np.array([1, 0]))
+            projectTo = projectTo
+            projectTo = np.transpose(projectTo)
+            dotProduct = projectTo.dot(statevector)
+            return dotProduct
+        
+        def getAllPossibilities(statevector, qubits):
+            bin_str = [''.join(p) for p in itertools.product('01', repeat=qubits)]
+            possibility = [list(p) for p in itertools.product([0, 1], repeat=qubits)]
+            result = []
+            for entry in range(len(possibility)):
+                dotProduct = returnProbabilitiy(statevector, possibility[entry])
+                probability = np.real(dotProduct * np.conj(dotProduct))
+                phase = np.angle(dotProduct)
+                if(probability > 0):
+                    result.append([bin_str[entry], probability, phase])
+            return result
+        
+        # Save results
+        simulator = Aer.get_backend('aer_simulator')
+        circ = transpile(circuit, simulator)
 
-        # Does same thing, but just gets all probabilities
-        def getAllPossibilities(result):
-            a = []
-            probabilitiesList = []
-            for idx in range(len(decomposedState)):
-                temp = []
-                currentArray = decomposedState[idx]
-                probabilities = np.zeros((len(currentArray),))
-                for index in range(len(currentArray)):
-                    dotWith = np.zeros((len(currentArray),))
-                    dotWith[index] = 1.0
-                    dotWith = np.dot(dotWith, currentArray[index])
-                    probabilities[index] = np.real(np.conj(dotWith).dot(dotWith))
-                probabilities = [element/np.sum(probabilities) for element in probabilities]
-                probabilitiesList.append(probabilities)
-                for j in range(len(decomposedState[idx])):
-                    if(probabilities[j] > 0):
-                        temp.append(j)
-                a.append(temp)
-            combinations = list(itertools.product(*a)) # Very underrated line to get all possible combination of array choices
-            for decisionSet in combinations:
-                decisionNum = 0
-                phase = 0
-                probability = 1
-                initalString = "0"*numQubits
-                for collectedState in decisionSet:
-                    s = bin(collectedState)
-                    stringToParse = "0"*(len(qubitsInvolvedInIndex[decisionNum]) - len(s[2:])) + s[2:]
-                    phase += decomposedState[decisionNum][collectedState]
-                    probability *= probabilitiesList[decisionNum][collectedState]
-                    index = 0
-                    for char in stringToParse:
-                        if(index < len(qubitsInvolvedInIndex[decisionNum])):
-                            truePosition = qubitsInvolvedInIndex[decisionNum][index]
-                            initalString = initalString[:truePosition] + char + initalString[truePosition + 1:]
-                            index += 1
-                        else:
-                            break
-                    decisionNum += 1
-                results.append([initalString, probability, phase])
-
-        # Get results, store figure, normalize, apply phase scalar map
-        results = []
-        getAllPossibilities(results)
+        # Run and get statevector
+        result = simulator.run(circ).result()
+        sv = result.get_statevector(circ)
+        sv = np.array(sv)
+        results = getAllPossibilities(sv, numQubits)
+        self.result = result
         fig = plt.figure(figsize = (20, 5))
         xVal = []
         yVal = []
