@@ -6,6 +6,10 @@ A GUI-based Quantum Circuit Simulator
 Introduction: 
    Quantum Computers represent promise in terms of physical simulation and for a handful of more general problems. It also represents a fundamental shift in how computation as a whole is viewed. However, when trying to learn quantum computing, one is either given the choice of an inflexible framework locked into one paradigm of quantum computation with a GUI or a flexible one with significant syntaxual overhead. In either case, building application for quantum computers are a secondary consideration to the primary goal of quantum simulation. QuantumCircuits aims to change this by giving students and professors alike access to an open-source learning software prioritizing 1) applications, 2) simplicity, 3) exposure, and 4) extendability.
    
+Resources:
+  1) Click on "wiki" in Github or go to this link: https://github.com/dylansheils/QuantumCircuits/wiki
+  2) The following online textbook: https://qiskit.org/learn/
+   
 Current Feature Set:
   1) Local CPU/GPU Hamiltonian/Feynman-like Simulation Capacities
   2) Friendly drag and drop GUI interface
@@ -16,6 +20,7 @@ Current Feature Set:
   8) Recommends modifications to Standard Gate-Model quantum computing circuits
   9) Allows emailing of your quantum circuit
   10) Provides the user an ability to make their own custom gates [ Removed Buggy, Will add later ]
+  11) Visualize Data Diagram associated with statevector simulation
 
 # Install Instructions (for x86/x64 systems) [No Requirements]
 
