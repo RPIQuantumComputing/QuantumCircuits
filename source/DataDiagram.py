@@ -108,6 +108,15 @@ def getSummation(root, level=0):
       return getProbability(root.get_amplitude())
     return getSummation(root.get_left(), level + 1) + getSummation(root.get_right(), level + 1)
 
+def printTree(root, level=0):
+    print("  " * (2*level), root, "Associations: ", root.get_associations(), type(root.get_data()))
+    if(root.get_left() != None):
+        printTree(root.get_left(), level + 1)
+    if(root.get_middle() != None):
+        printTree(root.get_middle(), level + 1)
+    if(root.get_right() != None):
+        printTree(root.get_right(), level + 1)
+
 def constructData(root, vector, history, approximation, qubits):
   partialNorm = np.dot(np.transpose(vector.conjugate()), vector)
   if(root.get_data() != "DD"):
@@ -132,7 +141,11 @@ def correctTree(root, vector):
   correctEntries(root, 0, unitCorrection, vector)
 
 def makeDataDiagram(vector, approximation, fftAllowed):
+  print("Constructing Data Diagram")
+  print("Given Vector: ")
+  print(vector)
   root = DataDiagram("DD")
+  print(root)
   qubits = math.ceil(math.log2(len(vector))) + 0.01
   constructData(root, vector, "", approximation, qubits)
   correctTree(root, vector)
@@ -148,3 +161,4 @@ def makeDataDiagram(vector, approximation, fftAllowed):
     prior = countEntries(root, 0)
     now = countEntries(rootFFT, 0)
     return rootFFT
+  return root
