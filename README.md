@@ -30,7 +30,7 @@ Current Feature Set:
 # Dockerization Install [Requires XServer and Docker]
 
 Note, Dockerization is required in addition to Nvidia GPU for cuQuantum backend support, waiting on Nvidia to release the package more widely.
-  1) docker run --gpus all -it -p 8905:8905 -p 8906:8906 nvcr.io/nvidia/cuquantum-appliance:22.07-cirq
+  1) docker run --gpus all -it --DISPLAY=localhost:0 -p 8905:8905 -p 8906:8906 nvcr.io/nvidia/cuquantum-appliance:22.07-cirq
   2) pip install jupyter qiskit pyqt5
   3) git clone https://github.com/dylansheils/QuantumCircuits.git
   4) apt-get update && apt-get install libgl1 redmail
@@ -40,7 +40,11 @@ Note, Dockerization is required in addition to Nvidia GPU for cuQuantum backend 
   8) cd source
   9) python DesignerGUI.py
 
-For deverlopers, one can access the local Jupyter notebook (development enviornment) by doing localhoast:8906/tree with Token appearing after running command #6. Also, recommendation is to use XServer for Windows.
+For deverlopers, one can access the local Jupyter notebook (development enviornment) by doing localhost:8906/tree with Token appearing after running command #6. Also, recommendation is to use XServer for Windows.
+
+Note, one can also use the provided Dockerfile explicitly.
+  1) docker build .
+  2) docker run --gpus all -it --DISPLAY=localhost:0 -p 8905:8905 -p 8906:8906
 
 # Install Instructions (for x86/x64 systems) [No Requirements]
 
