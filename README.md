@@ -45,6 +45,7 @@ For deverlopers, one can access the local Jupyter notebook (development enviornm
 Note, one can also use the provided Dockerfile explicitly.
   1) docker build . -t quantumcircuits
   2) docker run --gpus all -ti --net=local -p 8905:8905 -p 8906:8906 quantumcircuits
+
 Once in the enviornment, one can run "jupyter notebook --port=8905 --no-browser --ip=0.0.0.0 --allow-root" to launch a jupyter notebook or run "cd /QuantumCircuits/source" with "python DesignerGUI.py" to launch the application
 
 # Install Instructions (for x86/x64 systems) [No Requirements]
