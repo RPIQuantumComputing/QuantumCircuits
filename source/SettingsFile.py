@@ -14,5 +14,8 @@ class Settings:
     objectiveQUBOS = ""
     variableDeclarationsQUBO = []
     constraintsQUBO = []
+    bitstringsSample = []
+    gateSplit = 0
+    cuQuantumConfig = [0,1,2,3]
     specialGridSettings = {(-1, -1): [-1, -1]}
 

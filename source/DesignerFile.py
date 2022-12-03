@@ -256,6 +256,9 @@ class Designer:
     
     def addConstraint(self, string):
         self.settings.constraintsQUBO.append(string)
+        
+    def addBitstring(self, string):
+        self.settings.bitstringsSample.append(string)
 
     # Run qiskit transpilation to get gate suggestions
     def suggestSimplifications(self, grid):

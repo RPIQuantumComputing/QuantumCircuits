@@ -6,6 +6,8 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+from PyQt5.QtWidgets import QLineEdit
+from PyQt5.QtWidgets import QLabel
 from matplotlib.figure import Figure
 from PIL import Image
 from threading import *
@@ -63,6 +65,11 @@ photonicMode = False
 DWaveVar = ""
 DWaveCon = ""
 DwaveObjective = ""
+
+# Specific global state for cuQuantum
+cuQuantumBitStrings = []
+cuQuantumGateSplit = 0
+cuQuantumConfig = [0,1,2,3]
 
 # For field elements that complete change layout
 def forceUpdate():
@@ -179,6 +186,16 @@ def runSimulation():
         plt = designer.getVisualization()
         plt.show()
     else:
+        if(designer.settings.backend == "HamiltionSimulationCuQuantum"):
+            global cuQuantum
+            bitstrings = cuQuantumBitStrings.strip().split("\n")
+            for entry in bitstrings:
+                designer.addBitstring(entry)
+            global cuQuantumGateSplit
+            designer.settings.gateSplit = cuQuantumGateSplit
+            global cuQuantumConfig
+            designer.settings.cuQuantumConfig = cuQuantumConfig
+            
         # If not qubo optimization, it is a circuit problem, so display it
         print("Quantum Circuit Printout: ")
         print(grid)
@@ -217,6 +234,8 @@ def changeSimulationTechniqueHamiltonian():
     designer.setBackend("HamiltionSimulation")
     print("Changed backend to Hamiltion Simulation")
 def changeSimulationTechniqueHamiltonianCuQuantum():
+    global cuQuantumTab
+    cuQuantumTab.show()
     designer.setBackend("HamiltionSimulationCuQuantum")
     print("Changed backend to Hamiltion CuQuantum Simulation")
 def changeSimulationTechniqueFeynman():
@@ -366,6 +385,417 @@ def showTensorNetwork():
         G = TensorContractionGeneration.generateTensorNetworkGraph(layers, 4)
         TensorContractionGeneration.drawTensorNetworkGraph(G)
         plt.show()
+
+
+#the main workbench of qcd, a grid that supports drag & drop
+class IndicSelectWindow(QDialog):
+    def __init__(self, parent=None):
+        super(IndicSelectWindow, self).__init__(parent=parent)
+        self.resize(3000, 1200)
+        self.target = None
+        self.setAcceptDrops(True)
+        self.layout = QHBoxLayout(self)
+        self.scrollArea = QScrollArea(self)
+        self.scrollArea.setWidgetResizable(True)
+        self.scrollAreaWidgetContents = QWidget()
+        self.gridLayout = QGridLayout(self.scrollAreaWidgetContents)
+        self.scrollArea.setWidget(self.scrollAreaWidgetContents)
+        self.layout.addWidget(self.scrollArea)
+
+        # Go through the grid and initalize values
+        skipThis = [-1, -1] # For multiqubit gates, skip initalizing covered positions
+        for j in range(1, offSetHorizontal + 1):
+            for i in range(currentHeight):
+                if(skipThis[0] == i and skipThis[1] == j):
+                    grid[i][j - 1] = " "
+                    break
+                grid[i][j-1] = " "
+                self.Frame = QFrame(self)
+                self.Frame.setStyleSheet("background-color: white;")
+                self.Frame.setFrameStyle(QFrame.Panel | QFrame.Raised)
+                self.Frame.setLineWidth(0)
+                self.layout = QHBoxLayout(self.Frame)
+
+                self.figure = Figure()  # a figure to plot on
+                self.canvas = FigureCanvas(self.figure)
+                self.ax = self.figure.add_subplot(111)  # create an axis
+                if(j == offSetHorizontal):  # If we need to create the barrier
+                    self.Frame.setStyleSheet("background-color: grey;")
+                    Box = QVBoxLayout()
+                    Box.addWidget(self.Frame)
+                    self.gridLayout.addLayout(Box, i, j-1, len(grid)-2, 1)
+                    global priorBarrier
+                    priorBarrier = [i, j - 1, len(grid)-2, 1]
+                else: # If we are adding just a gate
+                    global customGates
+                    grid[i][j - 1] = inital(i, j - 1) # Find what gate if any should go in position
+                    if(grid[i][j - 1] in customGates):
+                        self.ax.text(0.5, 0.5, grid[i][j - 1], horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
+                    else:
+                        self.ax.imshow(gateToImage[grid[i][j - 1]]) # Show the gate
+                    self.ax.set_axis_off()
+                    self.canvas.draw()  # refresh canvas
+                    self.layout.addWidget(self.canvas)
+                    self.canvas.installEventFilter(self)
+                    Box = QVBoxLayout()
+                    Box.addWidget(self.Frame)
+                    self.gridLayout.addLayout(Box, i, j - 1)
+        # Go through and initalize field user interacts with
+        for i in range(offSetHorizontal, currentWidth + offSetHorizontal):
+            for j in range(currentHeight):
+                grid[j][i] = "-"
+                self.Frame = QFrame(self)
+                self.Frame.setStyleSheet("background-color: white;")
+                self.Frame.setLineWidth(0)
+                self.layout = QHBoxLayout(self.Frame)
+
+                self.figure = Figure()  # a figure to plot on
+                self.canvas = FigureCanvas(self.figure)
+                self.ax = self.figure.add_subplot(111)  # create an axis
+                self.ax.imshow(gateToImage["-"])
+                self.ax.set_axis_off()
+                self.canvas.draw()  # refresh canvas
+                self.canvas.installEventFilter(self)
+
+                self.layout.addWidget(self.canvas)
+
+                Box = QVBoxLayout()
+
+                Box.addWidget(self.Frame)
+
+                self.gridLayout.addLayout(Box, j, i)
+
+    # Run fo the mill event filter
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.MouseButtonPress:
+            self.mousePressEvent(event)
+        elif event.type() == QEvent.MouseMove:
+            self.mouseMoveEvent(event)
+        elif event.type() == QEvent.MouseButtonRelease:
+            self.mouseReleaseEvent(event)
+        return super().eventFilter(watched, event)
+
+    # Allow easy access to grid index from gridLayout position
+    def get_index(self, pos):
+        for i in range(self.gridLayout.count()):
+            if self.gridLayout.itemAt(i).geometry().contains(pos) and i != self.target:
+                return i
+
+    # Load up source information if user clicks a gate
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.target = self.get_index(event.windowPos().toPoint())
+        else:
+            self.Frame = QFrame(self)
+            self.Frame.setStyleSheet("background-color: white;")
+            self.Frame.setFrameStyle(QFrame.Panel | QFrame.Raised)
+            self.Frame.setLineWidth(0)
+            self.layout = QHBoxLayout(self.Frame)
+
+            self.figure = Figure()  # a figure to plot on
+            self.canvas = FigureCanvas(self.figure)
+            self.ax = self.figure.add_subplot(111)  # create an axis
+            row, col, _, _ = self.gridLayout.getItemPosition(self.get_index(event.windowPos().toPoint()))
+            self.ax.imshow(grid[row][col])
+            self.canvas.draw()  # refresh canvas
+            self.canvas.installEventFilter(self)
+
+            self.layout.addWidget(self.canvas)
+
+            Box = QVBoxLayout()
+
+            Box.addWidget(self.Frame)
+
+            self.gridLayout.addLayout(Box, 0, 6)
+            self.gridLayout.setColumnStretch(6, 1)
+            self.gridLayout.setRowStretch(0, 1)
+
+    # If moving the mouse, bring the element with you
+    def mouseMoveEvent(self, event):
+        if event.buttons() & Qt.LeftButton and self.target is not None:
+            drag = QDrag(self.gridLayout.itemAt(self.target))
+            pix = self.gridLayout.itemAt(self.target).itemAt(0).widget().grab()
+            mimedata = QMimeData()
+            mimedata.setImageData(pix)
+            drag.setMimeData(mimedata)
+            drag.setPixmap(pix)
+            drag.setHotSpot(event.pos())
+            drag.exec_()
+        global needToUpdate
+        global grid
+        global positionsWithCustomGates
+        # If we need to update the grid, update all positions to have GUI be consistent with Grid 2D array
+        if needToUpdate:
+            print("Updating....")
+            needToUpdate = False
+            skipThis = [-1, -1]
+            skip = {(-1, -1)}
+            for i in range(offSetHorizontal, currentWidth + offSetHorizontal):
+                for j in range(currentHeight):
+                    self.Frame = QFrame(self)
+                    self.Frame.setStyleSheet("background-color: white;")
+                    self.Frame.setLineWidth(0)
+                    self.layout = QHBoxLayout(self.Frame)
+
+                    self.figure = Figure()  # a figure to plot on
+                    self.canvas = FigureCanvas(self.figure)
+                    self.ax = self.figure.add_subplot(111)  # create an axis
+                    if((j, i) not in positionsWithCustomGates and (j, i) not in skip):
+                        if (grid[j][i] not in customGates):
+                            self.ax.imshow(gateToImage[grid[j][i]])
+                        else:
+                            self.ax.text(0.5, 0.5, grid[j][i], horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
+                        self.ax.set_axis_off()
+                        self.canvas.draw()  # refresh canvas
+                        self.canvas.installEventFilter(self)
+                        self.layout.addWidget(self.canvas)
+                        Box = QVBoxLayout()
+                        Box.addWidget(self.Frame)
+                        self.gridLayout.removeItem(self.gridLayout.itemAtPosition(j, i))
+                        self.gridLayout.addLayout(Box, j, i)
+                    else:
+                        if((j, i) not in skip):
+                            name = positionsWithCustomGates[(j, i)]
+                            self.ax.set_axis_off()
+                            self.canvas.draw()  # refresh canvas
+                            self.canvas.installEventFilter(self)
+                            self.layout.addWidget(self.canvas)
+                            Box = QVBoxLayout()
+                            Box.addWidget(self.Frame)
+                            self.gridLayout.addLayout(Box, j, i, len(customGates[name][0]), len(customGates[name][1]))
+                            for x in range(len(customGates[name][0])):
+                                for y in range(len(customGates[name][1])):
+                                    skip.add((j + x, i + y))
+                                    self.gridLayout.removeItem(self.gridLayout.itemAtPosition(j + x, i + y))
+
+    # If releasing, event on drag and drop occured, so neglect this gate
+    def mouseReleaseEvent(self, event):
+        self.target = None
+
+    # Only allow gates to be draggable elements
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasImage():
+            event.accept()
+        else:
+            event.ignore()
+
+    # Handle drop logic
+    def dropEvent(self, event):
+        if not event.source().geometry().contains(event.pos()):
+            source = self.get_index(event.pos())
+            if source is None:
+                return
+            # Get source and destination points
+            i, j = max(self.target, source), min(self.target, source)
+            row, col, _, _ = self.gridLayout.getItemPosition(self.target)
+            row2, col2, _, _ = self.gridLayout.getItemPosition(source)
+            global positionsWithCustomGates
+            global customGates
+            # If it is a photonic gate, get necessary values for gate specification
+            global photonicMode
+            if (photonicMode == True):
+                val1, val2 = 0.0, 0.0
+                val1 = QtWidgets.QInputDialog.getDouble(self, 'First Gate Argument', 'Input:')[0]
+                val2 = QtWidgets.QInputDialog.getDouble(self, 'Second Gate Argument', 'Input:')[0]
+                global designer
+                global offSetHorizontal
+                # Specify the gate properties
+                designer.settings.specialGridSettings[(col2-offSetHorizontal,row2)] = [val1, val2]
+                print(designer.settings.specialGridSettings)
+
+            p1, p2 = self.gridLayout.getItemPosition(self.target), self.gridLayout.getItemPosition(source)
+            # If we are moving a point on the user board, replace positions
+            if(self.gridLayout.getItemPosition(self.target)[1] < offSetHorizontal):
+                designer.giveGUIGrid(grid)
+                f = tempfile.NamedTemporaryFile(delete=False)
+                designer.saveSimulationToFile(f.name)
+                undoStack.append(f.name)
+                f.close()
+                self.Frame = QFrame(self)
+                self.Frame.setStyleSheet("background-color: white;")
+                self.Frame.setLineWidth(0)
+                self.layout = QHBoxLayout(self.Frame)
+                self.figure = Figure()  # a figure to plot on
+                self.canvas = FigureCanvas(self.figure)
+                self.ax = self.figure.add_subplot(111)  # create an axis
+                isCustom = False
+                if(inital(row, col) not in customGates):
+                    self.ax.imshow(gateToImage[inital(row, col)])
+                else:
+                    self.ax.text(0.5, 0.5, inital(row, col), horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
+                    isCustom = True
+                    print("Dropped Custom (Drag and Drop)")
+                if((row, col) in positionsWithCustomGates):
+                    isCustom = True
+                    grid[row][col]
+                self.ax.set_axis_off()
+                self.canvas.draw()  # refresh canvas
+                self.canvas.installEventFilter(self)
+                self.layout.addWidget(self.canvas)
+                Box = QVBoxLayout()
+                Box.addWidget(self.Frame)
+                self.gridLayout.takeAt(source)
+                if(isCustom):
+                    print("Calling updateGUILayout")
+                    grid[row2][col2] = grid[row][col]
+                    self.updateGUILayout()
+                else:
+                    self.gridLayout.addLayout(Box, row2, col2) #row2, col2
+                    grid[row2][col2] = grid[row][col]
+            else: # Else, ONLY move the gate in the user board
+                isCustom = False
+                if((row, col) in positionsWithCustomGates):
+                    name = positionsWithCustomGates[(row, col)]
+                    for x in range(len(customGates[name][0])):
+                        for y in range(len(customGates[name][1])):
+                            grid[row + x][col + y] = "-"
+                            self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row + x, col + y))
+                    grid[row][col] = name
+                    self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row, col))
+                    del positionsWithCustomGates[(row, col)]
+                    isCustom = True
+                if((row2, col2) in positionsWithCustomGates):
+                    name = positionsWithCustomGates[(row2, col2)]
+                    for x in range(len(customGates[name][0])):
+                        for y in range(len(customGates[name][1])):
+                            grid[row2 + x][col2 + y] = "-"
+                            self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row2 + x, col2 + y))
+                    grid[row2][col2] = name
+                    self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row2, col2))
+                    del positionsWithCustomGates[(row2, col2)]
+                    isCustom = True
+                grid[row][col], grid[row2][col2] = grid[row2][col2], grid[row][col]
+                if(isCustom):
+                    print("Calling updateGUILayout")
+                    self.canvas.draw()
+                    self.updateGUILayout()
+                else:
+                    tempA = self.gridLayout.itemAtPosition(row, col)
+                    tempB = self.gridLayout.itemAtPosition(row2, col2)
+                    self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row, col))
+                    self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row2, col2))
+                    self.gridLayout.addItem(tempA, *p2)
+                    self.gridLayout.addItem(tempB, *p1)
+
+            # Print out the grid (for debugging purposes)
+            print("Quantum Circuit Printout:")
+            print(grid)
+            numDepth = currentWidth
+            numQubits = currentHeight
+            entry = ""
+            for depth in range(3*(numDepth+1)):
+                entry += "-"
+            print(entry)
+            starredPositions = {(-1,-1)}
+            for qubit in range(numQubits):
+                tempStr = ""
+                nextOne = False
+                for depth in range(offSetHorizontal, numDepth + offSetHorizontal):
+                    if((qubit, depth) in starredPositions):
+                        tempStr += "[*]"
+                    else:
+                        tempStr += "[" + grid[qubit][depth] + "]"
+                    if(len(grid[qubit][depth]) >= 3 and "PP" not in grid[qubit][depth]):
+                        starredPositions.add((qubit + 1, depth))
+                tempStr += "[M]"
+                print(tempStr)
+            print(entry)
+
+    #update layout basesd on designer class' grid
+    def updateGUILayout(self):
+        global priorBarrier
+        global offSetHorizontal
+        global grid
+        global currentHeight
+        global customGates
+        global positionsWithCustomGates
+        global currentWidth
+        # Basically a repeat from GUI initalization, see those comments for explainations
+        skipThis = [-1, -1]
+        print("Is this it?")
+        for j in range(1, offSetHorizontal + 1):
+            for i in range(currentHeight):
+                if(skipThis[0] == i and skipThis[1] == j):
+                    grid[i][j - 1] = "-"
+                    break
+                grid[i][j-1] = "-"
+                self.Frame = QFrame(self)
+                self.Frame.setStyleSheet("background-color: white;")
+                self.Frame.setFrameStyle(QFrame.Panel | QFrame.Raised)
+                self.Frame.setLineWidth(0)
+                self.layout = QHBoxLayout(self.Frame)
+
+                self.figure = Figure()  # a figure to plot on
+                self.canvas = FigureCanvas(self.figure)
+                self.ax = self.figure.add_subplot(111)  # create an axis
+                if(j == offSetHorizontal):
+                    self.Frame.setStyleSheet("background-color: grey;")
+                    Box = QVBoxLayout()
+                    Box.addWidget(self.Frame)
+                    self.gridLayout.addLayout(Box, i, j-1, len(grid)-2, 1)
+                    priorBarrier = [i, j-1, len(grid)-2, 1]
+                else:
+                    grid[i][j - 1] = inital(i, j - 1)
+                    if(grid[i][j - 1] not in customGates):
+                        self.ax.imshow(gateToImage[grid[i][j - 1]])
+                    else:
+                        self.ax.text(0.5, 0.5, grid[j][i-1], horizontalalignment='center', verticalalignment='center',transform=self.ax.transAxes)
+                    self.ax.set_axis_off()
+                    self.canvas.draw()  # refresh canvas
+                    self.layout.addWidget(self.canvas)
+                    self.canvas.installEventFilter(self)
+                    Box = QVBoxLayout()
+                    Box.addWidget(self.Frame)
+                    self.gridLayout.addLayout(Box, i, j - 1)
+        skip = []
+        for i in range(offSetHorizontal, currentWidth + offSetHorizontal):
+            for j in range(currentHeight):
+                self.Frame = QFrame(self)
+                self.Frame.setStyleSheet("background-color: white;")
+                self.Frame.setLineWidth(0)
+                self.layout = QHBoxLayout(self.Frame)
+
+                self.figure = Figure()  # a figure to plot on
+                self.canvas = FigureCanvas(self.figure)
+                self.ax = self.figure.add_subplot(111)  # create an axis
+                isCustom = False
+                name = "NA"
+                if(grid[j][i] not in customGates and (j, i) not in positionsWithCustomGates):
+                    self.ax.imshow(gateToImage[grid[j][i]])
+                else:
+                    if((j, i) not in positionsWithCustomGates):
+                        self.Frame.setStyleSheet("background-color: black;")
+                        self.ax.text(0.2, 0.75, grid[j][i], horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
+                        self.ax.imshow(gateToImage[" "])
+                        isCustom = True
+                        print("Custom Detected")
+                        name = grid[j][i]
+                    else:
+                        name = positionsWithCustomGates[(j, i)]
+                        for x in range(len(customGates[name][0])):
+                            for y in range(len(customGates[name][1])):
+                                skip.append((j + x, i + y))
+                                self.gridLayout.removeItem(self.gridLayout.itemAtPosition(j + x, i + y))
+                        self.gridLayout.addLayout(Box, j, i, len(customGates[name][0]), len(customGates[name][1]))
+                if((j, i) in skip):
+                    self.ax.imshow(gateToImage[" "])
+                    self.Frame.setStyleSheet("background-color: black;")
+                self.ax.set_axis_off()
+                self.canvas.draw()  # refresh canvas
+                self.canvas.installEventFilter(self)
+                self.layout.addWidget(self.canvas)
+                Box = QVBoxLayout()
+                Box.addWidget(self.Frame)
+                if(not isCustom):
+                    self.gridLayout.addLayout(Box, j, i)
+                else:
+                    self.gridLayout.addLayout(Box, j, i, len(customGates[name][0]), len(customGates[name][1]))
+                    for x in range(len(customGates[name][0])):
+                        for y in range(len(customGates[name][1])):
+                            grid[j+x][i+y] = (customGates[name])[x][y]
+                            skip.append((j+x, i+y))
+                    positionsWithCustomGates[(j, i)] = name
+        print("UPDATED-------------------")
 
 
 #the main window for display
@@ -816,418 +1246,80 @@ class DWaveTab(QDialog):
         DWaveCon = self.dwave_con.toPlainText()
         DwaveObjective = self.dwave_obj.text()
         self.close()
+        
+class PartialSimulationTab(QDialog):
+    def __init__(self, parent=Window):
+        super(PartialSimulationTab, self).__init__()
+        self.layout = QVBoxLayout(self)
 
-#the main workbench of qcd, a grid that supports drag & drop
-class IndicSelectWindow(QDialog):
-    def __init__(self, parent=None):
-        super(IndicSelectWindow, self).__init__(parent=parent)
-        self.resize(3000, 1200)
-        self.target = None
-        self.setAcceptDrops(True)
-        self.layout = QHBoxLayout(self)
-        self.scrollArea = QScrollArea(self)
-        self.scrollArea.setWidgetResizable(True)
-        self.scrollAreaWidgetContents = QWidget()
-        self.gridLayout = QGridLayout(self.scrollAreaWidgetContents)
-        self.scrollArea.setWidget(self.scrollAreaWidgetContents)
-        self.layout.addWidget(self.scrollArea)
+        # basic initialization
+        self.setWindowTitle("Tensor Network Simulation Settings")
+        self.tabs = QTabWidget()
+        self.tab_addvar = QWidget()
+        self.tab_addobj = QWidget()
+        self.submit_but = QPushButton()
+        self.submit_but.setText("Submit")
+        self.submit_but.clicked.connect(lambda: self.submit())
 
-        # Go through the grid and initalize values
-        skipThis = [-1, -1] # For multiqubit gates, skip initalizing covered positions
-        for j in range(1, offSetHorizontal + 1):
-            for i in range(currentHeight):
-                if(skipThis[0] == i and skipThis[1] == j):
-                    grid[i][j - 1] = " "
-                    break
-                grid[i][j-1] = " "
-                self.Frame = QFrame(self)
-                self.Frame.setStyleSheet("background-color: white;")
-                self.Frame.setFrameStyle(QFrame.Panel | QFrame.Raised)
-                self.Frame.setLineWidth(0)
-                self.layout = QHBoxLayout(self.Frame)
+        self.tabs.addTab(self.tab_addvar, "Enter Sample Bitstrings")
+        self.tabs.addTab(self.tab_addobj, "Approximation Settings")
 
-                self.figure = Figure()  # a figure to plot on
-                self.canvas = FigureCanvas(self.figure)
-                self.ax = self.figure.add_subplot(111)  # create an axis
-                if(j == offSetHorizontal):  # If we need to create the barrier
-                    self.Frame.setStyleSheet("background-color: grey;")
-                    Box = QVBoxLayout()
-                    Box.addWidget(self.Frame)
-                    self.gridLayout.addLayout(Box, i, j-1, len(grid)-2, 1)
-                    global priorBarrier
-                    priorBarrier = [i, j - 1, len(grid)-2, 1]
-                else: # If we are adding just a gate
-                    global customGates
-                    grid[i][j - 1] = inital(i, j - 1) # Find what gate if any should go in position
-                    if(grid[i][j - 1] in customGates):
-                        self.ax.text(0.5, 0.5, grid[i][j - 1], horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
-                    else:
-                        self.ax.imshow(gateToImage[grid[i][j - 1]]) # Show the gate
-                    self.ax.set_axis_off()
-                    self.canvas.draw()  # refresh canvas
-                    self.layout.addWidget(self.canvas)
-                    self.canvas.installEventFilter(self)
-                    Box = QVBoxLayout()
-                    Box.addWidget(self.Frame)
-                    self.gridLayout.addLayout(Box, i, j - 1)
-        # Go through and initalize field user interacts with
-        for i in range(offSetHorizontal, currentWidth + offSetHorizontal):
-            for j in range(currentHeight):
-                grid[j][i] = "-"
-                self.Frame = QFrame(self)
-                self.Frame.setStyleSheet("background-color: white;")
-                self.Frame.setLineWidth(0)
-                self.layout = QHBoxLayout(self.Frame)
+        self.tab_addvar.layout = QVBoxLayout(self)
+        self.dwave_var = QTextEdit()
+        self.dwave_var.setPlaceholderText("Add your bitstrings here seperated by a newline")
+        self.tab_addvar.layout.addWidget(self.dwave_var)
+        self.tab_addvar.setLayout(self.tab_addvar.layout)
 
-                self.figure = Figure()  # a figure to plot on
-                self.canvas = FigureCanvas(self.figure)
-                self.ax = self.figure.add_subplot(111)  # create an axis
-                self.ax.imshow(gateToImage["-"])
-                self.ax.set_axis_off()
-                self.canvas.draw()  # refresh canvas
-                self.canvas.installEventFilter(self)
+        self.tab_addobj.layout = QVBoxLayout(self)
+        #self.tab_addobj.layout.addWidget(self.dwave_obj)
+        self.gateCheckBox = QCheckBox("Gate Split Reduce (only if large tensors)")
+        self.tab_addobj.layout.addWidget(self.gateCheckBox)
+        self.gateCheckBox.setChecked(False)
+        self.gateCheckBox.stateChanged.connect(lambda: self.click(self.gateCheckBox))
+        self.lineSVDCutoff = QLineEdit(self)
+        self.lineSVDCutoff.setPlaceholderText("SVD Cutoff Absolute")
+        self.tab_addobj.layout.addWidget(self.lineSVDCutoff)
+        self.lineSVDCutoffTrunc = QLineEdit(self)
+        self.lineSVDCutoffTrunc.setPlaceholderText("SVD Cutoff Truncation")
+        self.tab_addobj.layout.addWidget(self.lineSVDCutoffTrunc)
+        self.tab_addobj.setLayout(self.tab_addobj.layout)
 
-                self.layout.addWidget(self.canvas)
+        self.layout.addWidget(self.tabs)
+        self.layout.addWidget(self.submit_but)
+        self.setLayout(self.layout)
+        self.resize(800, 600)
 
-                Box = QVBoxLayout()
+    # override close event to update the text we got from user when tab is closed
+    def closeEvent(self, event):
+        global cuQuantumBitStrings
+        global cuQuantumConfig
+        cuQuantumBitStrings = self.dwave_var.toPlainText()
+        if(len(self.lineSVDCutoff.text()) > 0):
+            cuQuantumConfig[0] = float(self.lineSVDCutoff.text())
+        if(len(self.lineSVDCutoffTrunc.text()) > 0):
+            cuQuantumConfig[1] = float(self.lineSVDCutoffTrunc.text())
+        self.close()
 
-                Box.addWidget(self.Frame)
-
-                self.gridLayout.addLayout(Box, j, i)
-
-    # Run fo the mill event filter
-    def eventFilter(self, watched, event):
-        if event.type() == QEvent.MouseButtonPress:
-            self.mousePressEvent(event)
-        elif event.type() == QEvent.MouseMove:
-            self.mouseMoveEvent(event)
-        elif event.type() == QEvent.MouseButtonRelease:
-            self.mouseReleaseEvent(event)
-        return super().eventFilter(watched, event)
-
-    # Allow easy access to grid index from gridLayout position
-    def get_index(self, pos):
-        for i in range(self.gridLayout.count()):
-            if self.gridLayout.itemAt(i).geometry().contains(pos) and i != self.target:
-                return i
-
-    # Load up source information if user clicks a gate
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self.target = self.get_index(event.windowPos().toPoint())
+    def submit(self):
+        global cuQuantumBitStrings
+        global cuQuantumConfig
+        cuQuantumBitStrings = self.dwave_var.toPlainText()
+        if(len(self.lineSVDCutoff.text()) > 0):
+            cuQuantumConfig[0] = float(self.lineSVDCutoff.text())
+        if(len(self.lineSVDCutoffTrunc.text()) > 0):
+            cuQuantumConfig[1] = float(self.lineSVDCutoffTrunc.text())
+        self.close()
+        
+    def click(self, checkBox):
+        global cuQuantumGateSplit
+        if(checkBox.isChecked()):
+            cuQuantumGateSplit = 1
         else:
-            self.Frame = QFrame(self)
-            self.Frame.setStyleSheet("background-color: white;")
-            self.Frame.setFrameStyle(QFrame.Panel | QFrame.Raised)
-            self.Frame.setLineWidth(0)
-            self.layout = QHBoxLayout(self.Frame)
-
-            self.figure = Figure()  # a figure to plot on
-            self.canvas = FigureCanvas(self.figure)
-            self.ax = self.figure.add_subplot(111)  # create an axis
-            row, col, _, _ = self.gridLayout.getItemPosition(self.get_index(event.windowPos().toPoint()))
-            self.ax.imshow(grid[row][col])
-            self.canvas.draw()  # refresh canvas
-            self.canvas.installEventFilter(self)
-
-            self.layout.addWidget(self.canvas)
-
-            Box = QVBoxLayout()
-
-            Box.addWidget(self.Frame)
-
-            self.gridLayout.addLayout(Box, 0, 6)
-            self.gridLayout.setColumnStretch(6, 1)
-            self.gridLayout.setRowStretch(0, 1)
-
-    # If moving the mouse, bring the element with you
-    def mouseMoveEvent(self, event):
-        if event.buttons() & Qt.LeftButton and self.target is not None:
-            drag = QDrag(self.gridLayout.itemAt(self.target))
-            pix = self.gridLayout.itemAt(self.target).itemAt(0).widget().grab()
-            mimedata = QMimeData()
-            mimedata.setImageData(pix)
-            drag.setMimeData(mimedata)
-            drag.setPixmap(pix)
-            drag.setHotSpot(event.pos())
-            drag.exec_()
-        global needToUpdate
-        global grid
-        global positionsWithCustomGates
-        # If we need to update the grid, update all positions to have GUI be consistent with Grid 2D array
-        if needToUpdate:
-            print("Updating....")
-            needToUpdate = False
-            skipThis = [-1, -1]
-            skip = {(-1, -1)}
-            for i in range(offSetHorizontal, currentWidth + offSetHorizontal):
-                for j in range(currentHeight):
-                    self.Frame = QFrame(self)
-                    self.Frame.setStyleSheet("background-color: white;")
-                    self.Frame.setLineWidth(0)
-                    self.layout = QHBoxLayout(self.Frame)
-
-                    self.figure = Figure()  # a figure to plot on
-                    self.canvas = FigureCanvas(self.figure)
-                    self.ax = self.figure.add_subplot(111)  # create an axis
-                    if((j, i) not in positionsWithCustomGates and (j, i) not in skip):
-                        if (grid[j][i] not in customGates):
-                            self.ax.imshow(gateToImage[grid[j][i]])
-                        else:
-                            self.ax.text(0.5, 0.5, grid[j][i], horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
-                        self.ax.set_axis_off()
-                        self.canvas.draw()  # refresh canvas
-                        self.canvas.installEventFilter(self)
-                        self.layout.addWidget(self.canvas)
-                        Box = QVBoxLayout()
-                        Box.addWidget(self.Frame)
-                        self.gridLayout.removeItem(self.gridLayout.itemAtPosition(j, i))
-                        self.gridLayout.addLayout(Box, j, i)
-                    else:
-                        if((j, i) not in skip):
-                            name = positionsWithCustomGates[(j, i)]
-                            self.ax.set_axis_off()
-                            self.canvas.draw()  # refresh canvas
-                            self.canvas.installEventFilter(self)
-                            self.layout.addWidget(self.canvas)
-                            Box = QVBoxLayout()
-                            Box.addWidget(self.Frame)
-                            self.gridLayout.addLayout(Box, j, i, len(customGates[name][0]), len(customGates[name][1]))
-                            for x in range(len(customGates[name][0])):
-                                for y in range(len(customGates[name][1])):
-                                    skip.add((j + x, i + y))
-                                    self.gridLayout.removeItem(self.gridLayout.itemAtPosition(j + x, i + y))
-
-    # If releasing, event on drag and drop occured, so neglect this gate
-    def mouseReleaseEvent(self, event):
-        self.target = None
-
-    # Only allow gates to be draggable elements
-    def dragEnterEvent(self, event):
-        if event.mimeData().hasImage():
-            event.accept()
-        else:
-            event.ignore()
-
-    # Handle drop logic
-    def dropEvent(self, event):
-        if not event.source().geometry().contains(event.pos()):
-            source = self.get_index(event.pos())
-            if source is None:
-                return
-            # Get source and destination points
-            i, j = max(self.target, source), min(self.target, source)
-            row, col, _, _ = self.gridLayout.getItemPosition(self.target)
-            row2, col2, _, _ = self.gridLayout.getItemPosition(source)
-            global positionsWithCustomGates
-            global customGates
-            # If it is a photonic gate, get necessary values for gate specification
-            global photonicMode
-            if (photonicMode == True):
-                val1, val2 = 0.0, 0.0
-                val1 = QtWidgets.QInputDialog.getDouble(self, 'First Gate Argument', 'Input:')[0]
-                val2 = QtWidgets.QInputDialog.getDouble(self, 'Second Gate Argument', 'Input:')[0]
-                global designer
-                global offSetHorizontal
-                # Specify the gate properties
-                designer.settings.specialGridSettings[(col2-offSetHorizontal,row2)] = [val1, val2]
-                print(designer.settings.specialGridSettings)
-
-            p1, p2 = self.gridLayout.getItemPosition(self.target), self.gridLayout.getItemPosition(source)
-            # If we are moving a point on the user board, replace positions
-            if(self.gridLayout.getItemPosition(self.target)[1] < offSetHorizontal):
-                designer.giveGUIGrid(grid)
-                f = tempfile.NamedTemporaryFile(delete=False)
-                designer.saveSimulationToFile(f.name)
-                undoStack.append(f.name)
-                f.close()
-                self.Frame = QFrame(self)
-                self.Frame.setStyleSheet("background-color: white;")
-                self.Frame.setLineWidth(0)
-                self.layout = QHBoxLayout(self.Frame)
-                self.figure = Figure()  # a figure to plot on
-                self.canvas = FigureCanvas(self.figure)
-                self.ax = self.figure.add_subplot(111)  # create an axis
-                isCustom = False
-                if(inital(row, col) not in customGates):
-                    self.ax.imshow(gateToImage[inital(row, col)])
-                else:
-                    self.ax.text(0.5, 0.5, inital(row, col), horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
-                    isCustom = True
-                    print("Dropped Custom (Drag and Drop)")
-                if((row, col) in positionsWithCustomGates):
-                    isCustom = True
-                    grid[row][col]
-                self.ax.set_axis_off()
-                self.canvas.draw()  # refresh canvas
-                self.canvas.installEventFilter(self)
-                self.layout.addWidget(self.canvas)
-                Box = QVBoxLayout()
-                Box.addWidget(self.Frame)
-                self.gridLayout.takeAt(source)
-                if(isCustom):
-                    print("Calling updateGUILayout")
-                    grid[row2][col2] = grid[row][col]
-                    self.updateGUILayout()
-                else:
-                    self.gridLayout.addLayout(Box, row2, col2) #row2, col2
-                    grid[row2][col2] = grid[row][col]
-            else: # Else, ONLY move the gate in the user board
-                isCustom = False
-                if((row, col) in positionsWithCustomGates):
-                    name = positionsWithCustomGates[(row, col)]
-                    for x in range(len(customGates[name][0])):
-                        for y in range(len(customGates[name][1])):
-                            grid[row + x][col + y] = "-"
-                            self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row + x, col + y))
-                    grid[row][col] = name
-                    self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row, col))
-                    del positionsWithCustomGates[(row, col)]
-                    isCustom = True
-                if((row2, col2) in positionsWithCustomGates):
-                    name = positionsWithCustomGates[(row2, col2)]
-                    for x in range(len(customGates[name][0])):
-                        for y in range(len(customGates[name][1])):
-                            grid[row2 + x][col2 + y] = "-"
-                            self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row2 + x, col2 + y))
-                    grid[row2][col2] = name
-                    self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row2, col2))
-                    del positionsWithCustomGates[(row2, col2)]
-                    isCustom = True
-                grid[row][col], grid[row2][col2] = grid[row2][col2], grid[row][col]
-                if(isCustom):
-                    print("Calling updateGUILayout")
-                    self.canvas.draw()
-                    self.updateGUILayout()
-                else:
-                    tempA = self.gridLayout.itemAtPosition(row, col)
-                    tempB = self.gridLayout.itemAtPosition(row2, col2)
-                    self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row, col))
-                    self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row2, col2))
-                    self.gridLayout.addItem(tempA, *p2)
-                    self.gridLayout.addItem(tempB, *p1)
-
-            # Print out the grid (for debugging purposes)
-            print("Quantum Circuit Printout:")
-            print(grid)
-            numDepth = currentWidth
-            numQubits = currentHeight
-            entry = ""
-            for depth in range(3*(numDepth+1)):
-                entry += "-"
-            print(entry)
-            starredPositions = {(-1,-1)}
-            for qubit in range(numQubits):
-                tempStr = ""
-                nextOne = False
-                for depth in range(offSetHorizontal, numDepth + offSetHorizontal):
-                    if((qubit, depth) in starredPositions):
-                        tempStr += "[*]"
-                    else:
-                        tempStr += "[" + grid[qubit][depth] + "]"
-                    if(len(grid[qubit][depth]) >= 3 and "PP" not in grid[qubit][depth]):
-                        starredPositions.add((qubit + 1, depth))
-                tempStr += "[M]"
-                print(tempStr)
-            print(entry)
-
-    #update layout basesd on designer class' grid
-    def updateGUILayout(self):
-        global priorBarrier
-        global offSetHorizontal
-        global grid
-        global currentHeight
-        global customGates
-        global positionsWithCustomGates
-        global currentWidth
-        # Basically a repeat from GUI initalization, see those comments for explainations
-        skipThis = [-1, -1]
-        print("Is this it?")
-        for j in range(1, offSetHorizontal + 1):
-            for i in range(currentHeight):
-                if(skipThis[0] == i and skipThis[1] == j):
-                    grid[i][j - 1] = "-"
-                    break
-                grid[i][j-1] = "-"
-                self.Frame = QFrame(self)
-                self.Frame.setStyleSheet("background-color: white;")
-                self.Frame.setFrameStyle(QFrame.Panel | QFrame.Raised)
-                self.Frame.setLineWidth(0)
-                self.layout = QHBoxLayout(self.Frame)
-
-                self.figure = Figure()  # a figure to plot on
-                self.canvas = FigureCanvas(self.figure)
-                self.ax = self.figure.add_subplot(111)  # create an axis
-                if(j == offSetHorizontal):
-                    self.Frame.setStyleSheet("background-color: grey;")
-                    Box = QVBoxLayout()
-                    Box.addWidget(self.Frame)
-                    self.gridLayout.addLayout(Box, i, j-1, len(grid)-2, 1)
-                    priorBarrier = [i, j-1, len(grid)-2, 1]
-                else:
-                    grid[i][j - 1] = inital(i, j - 1)
-                    if(grid[i][j - 1] not in customGates):
-                        self.ax.imshow(gateToImage[grid[i][j - 1]])
-                    else:
-                        self.ax.text(0.5, 0.5, grid[j][i-1], horizontalalignment='center', verticalalignment='center',transform=self.ax.transAxes)
-                    self.ax.set_axis_off()
-                    self.canvas.draw()  # refresh canvas
-                    self.layout.addWidget(self.canvas)
-                    self.canvas.installEventFilter(self)
-                    Box = QVBoxLayout()
-                    Box.addWidget(self.Frame)
-                    self.gridLayout.addLayout(Box, i, j - 1)
-        skip = []
-        for i in range(offSetHorizontal, currentWidth + offSetHorizontal):
-            for j in range(currentHeight):
-                self.Frame = QFrame(self)
-                self.Frame.setStyleSheet("background-color: white;")
-                self.Frame.setLineWidth(0)
-                self.layout = QHBoxLayout(self.Frame)
-
-                self.figure = Figure()  # a figure to plot on
-                self.canvas = FigureCanvas(self.figure)
-                self.ax = self.figure.add_subplot(111)  # create an axis
-                isCustom = False
-                name = "NA"
-                if(grid[j][i] not in customGates and (j, i) not in positionsWithCustomGates):
-                    self.ax.imshow(gateToImage[grid[j][i]])
-                else:
-                    if((j, i) not in positionsWithCustomGates):
-                        self.Frame.setStyleSheet("background-color: black;")
-                        self.ax.text(0.2, 0.75, grid[j][i], horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
-                        self.ax.imshow(gateToImage[" "])
-                        isCustom = True
-                        print("Custom Detected")
-                        name = grid[j][i]
-                    else:
-                        name = positionsWithCustomGates[(j, i)]
-                        for x in range(len(customGates[name][0])):
-                            for y in range(len(customGates[name][1])):
-                                skip.append((j + x, i + y))
-                                self.gridLayout.removeItem(self.gridLayout.itemAtPosition(j + x, i + y))
-                        self.gridLayout.addLayout(Box, j, i, len(customGates[name][0]), len(customGates[name][1]))
-                if((j, i) in skip):
-                    self.ax.imshow(gateToImage[" "])
-                    self.Frame.setStyleSheet("background-color: black;")
-                self.ax.set_axis_off()
-                self.canvas.draw()  # refresh canvas
-                self.canvas.installEventFilter(self)
-                self.layout.addWidget(self.canvas)
-                Box = QVBoxLayout()
-                Box.addWidget(self.Frame)
-                if(not isCustom):
-                    self.gridLayout.addLayout(Box, j, i)
-                else:
-                    self.gridLayout.addLayout(Box, j, i, len(customGates[name][0]), len(customGates[name][1]))
-                    for x in range(len(customGates[name][0])):
-                        for y in range(len(customGates[name][1])):
-                            grid[j+x][i+y] = (customGates[name])[x][y]
-                            skip.append((j+x, i+y))
-                    positionsWithCustomGates[(j, i)] = name
-        print("UPDATED-------------------")
+            cuQuantumGateSplit = 0
+        
 # Create the application, window, and close application if asked
 app = QApplication(sys.argv)
+cuQuantumTab = PartialSimulationTab()
 window = Window()
 window.show()
 sys.exit(app.exec_())

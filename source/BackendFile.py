@@ -246,6 +246,7 @@ class HamiltonionCuQuantumBackend:
     def sendRequest(self, gridWidth, gridHeight, grid):
         from cuquantum import contract
         from cuquantum import CircuitToEinsum
+        import cuquantum
         # Get results, store figure, normalize, apply phase scalar map
 # Do similar decomposition process
         circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
@@ -307,14 +308,33 @@ class HamiltonionCuQuantumBackend:
                     result.append([bin_str[entry], probability, phase])
             return result
         
+        if(self.settings.gateSplit == 1):
+            print("Enabling Gate Split...")
+            cuquantum.cutensornet.GateSplitAlgo = 1
+        else:
+            cuquantum.cutensornet.GateSplitAlgo = 0
+        cuquantum.cutensornet.ABS_CUTOFF = self.settings.cuQuantumConfig[0]
+        cuquantum.cutensornet.REL_CUTOFF = self.settings.cuQuantumConfig[1]
+                
         # Save results
-        print("Performing Tensor Network Contraction")
-        expression, operands = myconverter.state_vector()
-        sv = contract(expression, *operands)
-        sv = sv.reshape(-1)
-        print("Statevector found by Tensor Network Contraction")
-        results = getAllPossibilities(sv, numQubits)
-        self.result = result
+        if(len(self.settings.bitstringsSample) <= 1):
+            print("Performing Tensor Network Contraction")
+            expression, operands = myconverter.state_vector()
+            sv = contract(expression, *operands)
+            sv = sv.reshape(-1)
+            print("Statevector found by Tensor Network Contraction")
+            results = getAllPossibilities(sv, numQubits)
+            self.result = results
+        else:
+            print("Performing Selective Tensor Network Contraction")
+            results = []
+            for bitstring in self.settings.bitstringsSample:
+                expression, operands = myconverter.amplitude(bitstring)
+                amplitude = contract(expression, *operands)
+                probability = abs(amplitude) ** 2
+                results.append([bitstring, probability, np.angle(amplitude)])
+            self.result = results
+            print("Finished sampling desired subset of distribution...")
         fig = plt.figure(figsize = (20, 5))
         xVal = []
         yVal = []
@@ -514,7 +534,7 @@ class XanaduBackend:
         # Save relevant infromation
         fig = plt.figure(figsize = (20, 5))
         plt.bar(result.keys(), result.values(), 1, color='b')
-        plt.xlabel("Fock Measurement State (binary representation for 'qubit' analysis")
+        plt.xlabel("Fock Measurement State (binary representation for 'qubit' analysis)")
         plt.ylabel("Occurences")
         print("Saving Values...")
         self.histogramResult = plt
