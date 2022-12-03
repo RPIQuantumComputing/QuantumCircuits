@@ -29,24 +29,13 @@ Current Feature Set:
 
 # Dockerization Install [Requires XServer and Docker]
 
-Note, Dockerization is required in addition to Nvidia GPU for cuQuantum backend support, waiting on Nvidia to release the package more widely.
-  1) docker run --gpus all -it --DISPLAY=localhost:0 -p 8905:8905 -p 8906:8906 nvcr.io/nvidia/cuquantum-appliance:22.07-cirq
-  2) pip install jupyter qiskit pyqt5
-  3) git clone https://github.com/dylansheils/QuantumCircuits.git
-  4) apt-get update && apt-get install libgl1 redmail
-  5) apt-get install '^libxcb.*-dev' libx11-xcb-dev libglu1-mesa-dev libxrender-dev libxi-dev libxkbcommon-dev libxkbcommon-x11-dev
-  6) jupyter notebook --port=8905 --no-browser --ip=0.0.0.0 --allow-root
-  7) cd QuantumCircuits
-  8) cd source
-  9) python DesignerGUI.py
-
-For deverlopers, one can access the local Jupyter notebook (development enviornment) by doing localhost:8906/tree with Token appearing after running command #6. Also, recommendation is to use XServer for Windows.
+Note, Dockerization is required in addition to Nvidia GPU for cuQuantum backend support, waiting on Nvidia to release the package more widely. Recommendation is to use Xming for XServer on Windows.
 
 Note, one can also use the provided Dockerfile explicitly.
   1) docker build . -t quantumcircuits
   2) docker run --gpus all -ti --net=local -p 8905:8905 -p 8906:8906 quantumcircuits
 
-Once in the enviornment, one can run "jupyter notebook --port=8905 --no-browser --ip=0.0.0.0 --allow-root" to launch a jupyter notebook or run "cd /QuantumCircuits/source" with "python DesignerGUI.py" to launch the application
+Once in the enviornment, one can run "jupyter notebook --port=8905 --no-browser --ip=0.0.0.0 --allow-root" to launch a jupyter notebook or run "cd QuantumCircuits/source" with "python DesignerGUI.py" to launch the application
 
 # Install Instructions (for x86/x64 systems) [No Requirements]
 
