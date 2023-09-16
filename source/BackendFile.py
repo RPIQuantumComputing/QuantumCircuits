@@ -27,7 +27,7 @@ from qiskit import QuantumCircuit
 from qiskit import Aer, transpile
 import qiskit
 from qiskit.tools.visualization import plot_histogram, plot_state_city
-from qiskit.providers.aer.library import save_statevector
+from qiskit_aer.library.save_instructions import save_statevector
 import qiskit.quantum_info as qi
 
 class HamiltonionBackend:
