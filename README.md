@@ -43,7 +43,25 @@ Click upper right and download ".zip", open terminal in extracted directory
 
 Windows: Run "bash installWindows.sh" and follow prompt instructions
 
-Linux: Run "./installLinux.sh" and follow prompt instructions
+Linux: 
+    1) You have to run the cuda installer: 
+        https://developer.nvidia.com/cuda-downloads?target_os=Linux
+
+    2) Select the specifications of your Linux machine and download the installer.
+
+    3) Alternatively, you can install cuda on Ubuntu with:
+    
+```bash
+    sudo apt-get install nvidia-cuda-toolkit
+```
+
+    4) If you're on Linux:
+
+```bash
+    sudo dnf install nvidia-cuda-toolkit
+```
+
+    5) Run "./installLinux.sh" and follow prompt instructions
 
 MacOS: Run "./installMacOS.sh" and follow prompt instructions
 
