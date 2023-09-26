@@ -1,7 +1,6 @@
 FROM nvcr.io/nvidia/cuquantum-appliance:22.07-cirq
 EXPOSE 8905
 ENV DISPLAY=host.docker.internal:0.0
-RUN docker network create local
 RUN apt-get update
 RUN pip install jupyter qiskit pyqt5 redmail qiskit-aer
 RUN git clone https://github.com/dylansheils/QuantumCircuits.git
