@@ -832,7 +832,7 @@ class Window(QMainWindow):
         button_exit = QAction("&Exit", self)
         menu.addAction(button_exit)
         #additional exit button (why not)
-        button_exit.triggered.connect(lambda: self.closeEvent())
+        button_exit.triggered.connect(lambda: self.closeEvent(parent))
 
         #file I/O actions
         save = QAction("&Save", self)
