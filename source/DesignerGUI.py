@@ -1,37 +1,33 @@
-from glob import glob
-import sys, random, os
-from unittest import skip
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
+import sys
+import random
+import os
 import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
-from PyQt5.QtWidgets import QLineEdit
-from PyQt5.QtWidgets import QLabel
-from matplotlib.figure import Figure
-from PIL import Image
-from threading import *
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from PyQt5 import QtCore, QtGui, QtWidgets
 import DesignerFile
-from redmail import EmailSender
-from redmail import outlook
 import numpy as np
-from pathlib import Path
-import pandas as pd
 import tempfile
 import DataDiagram
 import ParseCircuit
 import TensorContractionGeneration
 import networkx as nx
+import subprocess
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from PIL import Image
+from threading import *
+from redmail import EmailSender
+from pathlib import Path
+
 
 # Default X ignore
 ignoreX = 4
 
 # Load up all graphic images, Singleton design pattern
-gateToImage = {" ": Image.open("../assets/EMPTY.png"), "-": Image.open("../assets/GATE.png"), "H": Image.open("../assets/H.png"), 
-                "T": Image.open("../assets/T.png"), "S": Image.open("../assets/S.png"), "X": Image.open("../assets/X.png"), "Y": Image.open("../assets/Y.png"),
-                "Z": Image.open("../assets/Z.png"), "CNOT": Image.open("../assets/CNOT.png"),
+gateToImage = {" ": Image.open("../assets/EMPTY.png"), "-": Image.open("../assets/GATE.png"), "H": Image.open("../assets/H.png"),
+               "T": Image.open("../assets/T.png"), "S": Image.open("../assets/S.png"), "X": Image.open("../assets/X.png"), "Y": Image.open("../assets/Y.png"),
+               "Z": Image.open("../assets/Z.png"), "CNOT": Image.open("../assets/CNOT.png"),
                "PBS": Image.open("../assets/PBS.png"), "PCK": Image.open("../assets/PCK.png"), "PCX": Image.open("../assets/PCX.png"),
                "PCZ": Image.open("../assets/PCZ.png"), "PD": Image.open("../assets/PD.png"), "PF": Image.open("../assets/PF.png"),
                "PMZ": Image.open("../assets/PMZ.png"), "PPC": Image.open("../assets/PPC.png"), "PPF": Image.open("../assets/PPF.png"),
@@ -50,10 +46,11 @@ undoStack = []
 redoStack = []
 
 # Default to the "-" gate, store previous position of barrier
-grid = [["-" for i in range(currentWidth + offSetHorizontal)] for j in range(currentHeight)]
-priorBarrier = [-1,-1,-1,-1]
+grid = [["-" for i in range(currentWidth + offSetHorizontal)]
+        for j in range(currentHeight)]
+priorBarrier = [-1, -1, -1, -1]
 
-# Initalize Designer
+# Initialize Designer
 designer = DesignerFile.Designer(currentHeight, currentWidth)
 
 # Various graphics settings
@@ -69,14 +66,7 @@ DwaveObjective = ""
 # Specific global state for cuQuantum
 cuQuantumBitStrings = []
 cuQuantumGateSplit = 0
-cuQuantumConfig = [0,1,2,3]
-
-# For field elements that complete change layout
-def forceUpdate():
-    global window
-    window.close()
-    window = Window()
-    window.show()
+cuQuantumConfig = [0, 1, 2, 3]
 
 gmail = EmailSender(
     host='smtp.office365.com',
@@ -85,189 +75,246 @@ gmail = EmailSender(
     password="dylansheils0241"
 )
 
-# Cursed as it is, this is a lookup table to store the inital gate positions
-def inital(row, col):
-    if(photonicMode == False):
-        if(row == 0 and col == 0):
-            return "H"
-        if(row == 0 and col == 1):
-            return "X"
-        if(row == 1 and col == 0):
-            return "Y"
-        if(row == 1 and col == 1):
-            return "Z"
-        if(row == 2 and col == 0):
-            return "S"
-        if(row == 2 and col == 1):
-            return "T"
-        if(row == 3 and col == 0):
-            return "CNOT"
-        if(row == 3 and col == 1):
-            if(len(customGates) != 0):
-                return list(customGates.keys())[0]
-        if(row == 4 and col == 0):
-            if(len(customGates) > 1):
-                return list(customGates.keys())[1]
-        if(row == 4 and col == 1):
-            if(len(customGates) > 2):
-                return list(customGates.keys())[2]
-    else:
-        if(row == 0 and col == 0):
-            return "PX"
-        if(row == 0 and col == 1):
-            return "PZ"
-        if(row == 0 and col == 2):
-            return "PS"
-        if(row == 0 and col == 3):
-            return "PS2"
-        if(row == 1 and col == 0):
-            return "PMZ"
-        if(row == 1 and col == 1):
-            return "PCX"
-        if(row == 1 and col == 2):
-            return "PD"
-        if(row == 1 and col == 3):
-            return "PF"
-        if(row == 2 and col == 0):
-            return "PBS"
-        if(row == 2 and col == 1):
-            return "PCK"
-        if(row == 2 and col == 2):
-            return "PPC"
-        if(row == 2 and col == 3):
-            return "PPF"
-        if(row == 3 and col == 0):
-            return "PPV"
-        if(row == 3 and col == 1):
-            if(len(customGates) != 0):
-                return list(customGates.keys())[0]
-        if(row == 3 and col == 2):
-            if(len(customGates) > 1):
-                return list(customGates.keys())[1]
-        if(row == 3 and col == 3):
-            if(len(customGates) > 2):
-                return list(customGates.keys())[2]
-    return " "
+# For field elements that complete change layout
+def forceUpdate():
+    window.close()
+    window = Window()
+    window.show()
 
+# Cursed as it is, this is a lookup table to store the initial gate positions
+# def initial(row, col):
+#     if (photonicMode == False):
+#         if (row == 0 and col == 0):
+#             return "H"
+#         if (row == 0 and col == 1):
+#             return "X"
+#         if (row == 1 and col == 0):
+#             return "Y"
+#         if (row == 1 and col == 1):
+#             return "Z"
+#         if (row == 2 and col == 0):
+#             return "S"
+#         if (row == 2 and col == 1):
+#             return "T"
+#         if (row == 3 and col == 0):
+#             return "CNOT"
+#         if (row == 3 and col == 1):
+#             if (len(customGates) != 0):
+#                 return list(customGates.keys())[0]
+#         if (row == 4 and col == 0):
+#             if (len(customGates) > 1):
+#                 return list(customGates.keys())[1]
+#         if (row == 4 and col == 1):
+#             if (len(customGates) > 2):
+#                 return list(customGates.keys())[2]
+#     else:
+#         if (row == 0 and col == 0):
+#             return "PX"
+#         if (row == 0 and col == 1):
+#             return "PZ"
+#         if (row == 0 and col == 2):
+#             return "PS"
+#         if (row == 0 and col == 3):
+#             return "PS2"
+#         if (row == 1 and col == 0):
+#             return "PMZ"
+#         if (row == 1 and col == 1):
+#             return "PCX"
+#         if (row == 1 and col == 2):
+#             return "PD"
+#         if (row == 1 and col == 3):
+#             return "PF"
+#         if (row == 2 and col == 0):
+#             return "PBS"
+#         if (row == 2 and col == 1):
+#             return "PCK"
+#         if (row == 2 and col == 2):
+#             return "PPC"
+#         if (row == 2 and col == 3):
+#             return "PPF"
+#         if (row == 3 and col == 0):
+#             return "PPV"
+#         if (row == 3 and col == 1):
+#             if (len(customGates) != 0):
+#                 return list(customGates.keys())[0]
+#         if (row == 3 and col == 2):
+#             if (len(customGates) > 1):
+#                 return list(customGates.keys())[1]
+#         if (row == 3 and col == 3):
+#             if (len(customGates) > 2):
+#                 return list(customGates.keys())[2]
+#     return " "
+
+
+def initial(row, col):
+    gate_dict = {}
+    if (photonicMode):
+        gate_dict = {
+            (0, 0): "PX",
+            (0, 1): "PZ",
+            (0, 2): "PS",
+            (0, 3): "PS2",
+            (1, 0): "PMZ",
+            (1, 1): "PCX",
+            (1, 2): "PD",
+            (1, 3): "PF",
+            (2, 0): "PBS",
+            (2, 1): "PCK",
+            (2, 2): "PPC",
+            (2, 3): "PPF",
+            (3, 0): "PPV",
+            (3, 1): list(customGates.keys())[0] if len(customGates) != 0 else " ",
+            (3, 2): list(customGates.keys())[1] if len(customGates) > 1 else " ",
+            (3, 3): list(customGates.keys())[2] if len(customGates) > 2 else " ",
+        }
+    else:
+        gate_dict = {
+            (0, 0): "H",
+            (0, 1): "X",
+            (1, 0): "Y",
+            (1, 1): "Z",
+            (2, 0): "S",
+            (2, 1): "T",
+            (3, 0): "CNOT",
+            (3, 1): list(customGates.keys())[0] if len(customGates) != 0 else " ",
+            (4, 0): list(customGates.keys())[1] if len(customGates) > 1 else " ",
+            (4, 1): list(customGates.keys())[2] if len(customGates) > 2 else " ",
+        }
+    return gate_dict.get((row, col), " ")
 
 # This runs the simulation
 def runSimulation():
     print("---------------------Running Simulation-------------------------------------")
     # PENDING upon which BACKEND is selected, the control flow is different [might need other GUI settings]
-    #run simulation with Dwave ocean
+    # run simulation with Dwave ocean
     if (designer.settings.backend == "DWaveSimulation"):
         print("User Variables added: \n")
 
-        #get user's input variables as plain text and split
-        #then add each unique line to backend
-        variables = DWaveVar.strip().split("\n")
-        variables = list(set(variables))
+        # get user's input variables as plain text and split
+        # then add each unique line to backend
+        variables = list(set(DWaveVar.strip().split("\n")))
         for variable in variables:
             designer.addVariable(variable)
             print(variable)
 
         print("User constraint added: \n")
-        #get user's input constraint as plain text and split
-        #then add each unique line to backend
-        constraints = DWaveCon.strip().split("\n")
-        constraints = list(set(constraints))
+        # get user's input constraint as plain text and split
+        # then add each unique line to backend
+        constraints = list(set(DWaveCon.strip().split("\n")))
         for constraint in constraints:
             designer.addConstraint(constraint)
             print(constraint)
 
-        #get user's input objective
-        print("Objective set to: \n")
-        global DwaveObjective
-        print(DwaveObjective)
-        objective = DwaveObjective
-        designer.setObjective(objective)
-        print(objective)
+        # get user's input objective
+        print(f"Objective set to: \n{DwaveObjective}")
+
+        designer.setObjective(DwaveObjective)
         designer.runSimulation()
         plt = designer.getVisualization()
         plt.show()
     else:
-        if(designer.settings.backend == "HamiltionSimulationCuQuantum"):
-            global cuQuantum
+        if (designer.settings.backend == "HamiltionSimulationCuQuantum"):
             bitstrings = cuQuantumBitStrings.strip().split("\n")
             for entry in bitstrings:
                 designer.addBitstring(entry)
-            global cuQuantumGateSplit
             designer.settings.gateSplit = cuQuantumGateSplit
-            global cuQuantumConfig
             designer.settings.cuQuantumConfig = cuQuantumConfig
-            
+
         # If not qubo optimization, it is a circuit problem, so display it
-        print("Quantum Circuit Printout: ")
-        print(grid)
-        numDepth = currentWidth
-        numQubits = currentHeight
+        print(f"Quantum Circuit Printout: \n{grid}")
+
+        numDepth, numQubits = currentWidth, currentHeight
+
         entry = ""
         for depth in range(3*(numDepth+1)):
             entry += "-"
         print(entry)
-        starredPositions = {(-1,-1)}
+
+        starredPositions = {(-1, -1)}
         for qubit in range(numQubits):
             tempStr = ""
-            nextOne = False
             for depth in range(offSetHorizontal, numDepth):
-                if((qubit, depth) in starredPositions):
+                if ((qubit, depth) in starredPositions):
                     tempStr += "[*]"
                 else:
-                    designer.gateAddition(grid[qubit][depth], depth-offSetHorizontal, qubit)
+                    designer.gateAddition(
+                        grid[qubit][depth], depth-offSetHorizontal, qubit)
                     tempStr += "[" + grid[qubit][depth] + "]"
-                if(len(grid[qubit][depth]) >= 3 and "PP" not in grid[qubit][depth]):
+                if (len(grid[qubit][depth]) >= 3 and "PP" not in grid[qubit][depth]):
                     starredPositions.add((qubit + 1, depth))
                 tempStr += "[M]"
             print(tempStr)
+
         print(entry)
         print("------------------------BACKEND GOT-------------------------------------")
+
         # Have the designer confirm the board (for debugging)
         designer.printDesign()
-        # Run the simulation
         designer.runSimulation()
-        # Get the output
         plt = designer.getVisualization()
         plt.show()
 
-#changes settingfile based on user choice
+# changes settingfile based on user choice
 def changeSimulationTechniqueHamiltonian():
     designer.setBackend("HamiltionSimulation")
     print("Changed backend to Hamiltion Simulation")
+
+
 def changeSimulationTechniqueHamiltonianCuQuantum():
     global cuQuantumTab
     cuQuantumTab.show()
     designer.setBackend("HamiltionSimulationCuQuantum")
     print("Changed backend to Hamiltion CuQuantum Simulation")
+
+
 def changeSimulationTechniqueFeynman():
     designer.setBackend("FeynmanSimulation")
     print("Changed backend to Feynman Simulation")
+
+
 def changeSimulationTechniqueDWave():
     designer.setBackend("DWaveSimulation")
     print("Changed backend to DWave Ocean")
+
+
 def changeSimulationTechniqueIBM():
     designer.setBackend("IBMSimulation")
     print("Changed backend to IBM Xanadu")
+
+
 def changeSimulationTechniqueQiskit():
     designer.setBackend("Qiskit")
     print("Changed to Qiskit Backend")
+
+
 def changeSimulationTechniqueXanadu():
     designer.setBackend("Photonic")
     print("Changed to Xanadu Photonic Backend")
 
 # Change Various settings based on click events, self-explanatory
+
+
 def changeMeasurement(checked):
     designer.settings.measurement = checked
     print("Set measurement to " + str(checked))
+
+
 def changeSuggestion(checked):
     designer.settings.gate_suggestion = checked
     designer.suggestSimplifications(grid)
     print("Set gate suggestion to " + str(checked))
+
+
 def changeIncresav(checked):
     designer.settings.incremental_saving = checked
     print("Set incremental saving to " + str(checked))
+
+
 def changeIncresim(checked):
     designer.settings.incremental_simulation = checked
     print("Set incremental simulation to " + str(checked))
+
+
 def updateNumQubit(val):
     designer.settings.num_qubits = val
     global currentHeight
@@ -288,10 +335,11 @@ def updateNumWidth(val):
     currentWidth = val
     print("Set width to " + str(val))
 
+
 def dataDiagramVisualization():
     histogram = designer.getStatistics()
-    if(type(histogram) == type(list())):
-        histogramNew = dict() 
+    if (type(histogram) == type(list())):
+        histogramNew = dict()
         for entry in histogram:
             histogramNew[entry[0]] = entry[1]
         histogram = histogramNew
@@ -307,59 +355,71 @@ def dataDiagramVisualization():
         vector[0][int(entry, 2)] = value/sumHistogram
     print(vector)
     root = DataDiagram.makeDataDiagram(vector[0], 0, False)
+
     G = nx.Graph()
-    def followSelf(root, prior):
-        finalValue = prior
-        while((root.get_left() != None and str(root) == str(root.get_left())) or (root.get_right() != None and str(root) == str(root.get_right()))):
-            if(root.get_left() != None and str(root) == str(root.get_left())):
-                if(finalValue > root.get_left().get_amplitude()):
-                    finalValue = root.get_left().get_amplitude()
-                root = root.get_left()
-            if(root.get_right() != None and str(root) == str(root.get_right())):
-                if(finalValue > root.get_right().get_amplitude()):
-                    finalValue = root.get_right().get_amplitude()
-                root = root.get_right()
-        return finalValue
-    def createGraph(root, parent, G, index=0, level=0):
-        if(not G.has_node(str(root))):
-            G.add_node(str(root), pos=(index, -level))
-        if(str(root) != "DD"):
-            if(root != None and root.get_left() != None and str(root) == str(root.get_left())):
-                G.add_edge(str(parent), str(root), weight=round(followSelf(root, root.get_left().get_amplitude()),2))
-            else:
-                if(root != None and root.get_right() != None and str(root) == str(root.get_right())):
-                    G.add_edge(str(parent), str(root), weight=round(followSelf(root, root.get_right().get_amplitude()),2))
-                else:
-                    if(root != None and str(parent) != str(root)):
-                        G.add_edge(str(parent), str(root), weight=round(root.get_amplitude(),2))
-        if(root != None):
-            print("  " * (2*level), root, "| Amplitude: ", root.get_amplitude())
-        if(root != None and root.get_left() != None):
-            createGraph(root.get_left(), root, G, (index), level + 1)
-        if(root != None and root.get_right() != None):
-            createGraph(root.get_right(), root, G, (index+1), level + 1)
+
     createGraph(root, root, G)
-    pos=nx.get_node_attributes(G,'pos')
-    nx.draw(G,pos,with_labels=True)
+    pos = nx.get_node_attributes(G, 'pos')
+    nx.draw(G, pos, with_labels=True)
     # Currently, the implementation is buggy...to say the least, works with amplitudes, just don't show the user :P
-    #labels = nx.get_edge_attributes(G,'weight')
-    #nx.draw_networkx_edge_labels(G,pos,edge_labels=labels)
+    # labels = nx.get_edge_attributes(G,'weight')
+    # nx.draw_networkx_edge_labels(G,pos,edge_labels=labels)
     plt.show()
-    
+
+
+def followSelf(root, prior):
+    finalValue = prior
+    while ((root.get_left() != None and str(root) == str(root.get_left())) or (root.get_right() != None and str(root) == str(root.get_right()))):
+        if (root.get_left() != None and str(root) == str(root.get_left())):
+            if (finalValue > root.get_left().get_amplitude()):
+                finalValue = root.get_left().get_amplitude()
+            root = root.get_left()
+        if (root.get_right() != None and str(root) == str(root.get_right())):
+            if (finalValue > root.get_right().get_amplitude()):
+                finalValue = root.get_right().get_amplitude()
+            root = root.get_right()
+    return finalValue
+
+def createGraph(root, parent, G, index=0, level=0):
+    if (not G.has_node(str(root))):
+        G.add_node(str(root), pos=(index, -level))
+    if (str(root) != "DD"):
+        if (root != None and root.get_left() != None and str(root) == str(root.get_left())):
+            G.add_edge(str(parent), str(root), weight=round(
+                followSelf(root, root.get_left().get_amplitude()), 2))
+        else:
+            if (root != None and root.get_right() != None and str(root) == str(root.get_right())):
+                G.add_edge(str(parent), str(root), weight=round(
+                    followSelf(root, root.get_right().get_amplitude()), 2))
+            else:
+                if (root != None and str(parent) != str(root)):
+                    G.add_edge(str(parent), str(root),
+                                weight=round(root.get_amplitude(), 2))
+    if (root != None):
+        print("  " * (2*level), root, "| Amplitude: ", root.get_amplitude())
+    if (root != None and root.get_left() != None):
+        createGraph(root.get_left(), root, G, (index), level + 1)
+    if (root != None and root.get_right() != None):
+        createGraph(root.get_right(), root, G, (index+1), level + 1)
+
+
 def showParseGrid():
-    tempGrid = [["H", "H", "S", "-", "-"], ["CNOT", "*", "-", "-", "-"], ["-", "CNOT", "*", "-", "-"], ["CNOT", "*", "CCX", "*", "*"], ["CCX", "*", "*", "S", "-"], ["S", "-", "-", "-", "-"]]
+    tempGrid = [["H", "H", "S", "-", "-"], ["CNOT", "*", "-", "-", "-"], ["-", "CNOT", "*", "-",
+                                                                          "-"], ["CNOT", "*", "CCX", "*", "*"], ["CCX", "*", "*", "S", "-"], ["S", "-", "-", "-", "-"]]
     print("---------------------------PARSER IMPLEMENTATION IN PROGRESS-------------------------------------")
     for entry in tempGrid:
         print(entry)
     print("---------------------------------LL(1) PARSER---------------------------------------------")
     ParseCircuit.parse(tempGrid)
-    
+
+
 def showTensorNetwork():
     gridA = [["H", "H", "S", "-", "-"], ["CNOT", "*", "-", "-", "-"], ["-", "CNOT", "*", "-", "-"],
-        ["CNOT", "*", "CCX", "*", "*"], ["CCX", "*", "*", "S", "-"], ["S", "-", "-", "-", "-"]]
-    gridB = [["H", "H", "H", "H"], ["CX", "*", "X(1/2)", "T"], ["X(1/2)", "CX", "*", "Y(1/2)"], ["T", "X(1/2)", "CX", "*"], ["CX", "-", "-", "*"], ["H", "H", "H", "H"]]
+             ["CNOT", "*", "CCX", "*", "*"], ["CCX", "*", "*", "S", "-"], ["S", "-", "-", "-", "-"]]
+    gridB = [["H", "H", "H", "H"], ["CX", "*", "X(1/2)", "T"], ["X(1/2)", "CX", "*", "Y(1/2)"], [
+        "T", "X(1/2)", "CX", "*"], ["CX", "-", "-", "*"], ["H", "H", "H", "H"]]
     print("---------------------------PARSER IMPLEMENTATION IN PROGRESS-------------------------------------")
-    if(random.random() >= 0.5):
+    if (random.random() >= 0.5):
         print("EXAMPLE NETWORK 1: (GRID A)")
         array = np.array(gridA)
         transposed_array = array.T
@@ -387,7 +447,7 @@ def showTensorNetwork():
         plt.show()
 
 
-#the main workbench of qcd, a grid that supports drag & drop
+# the main workbench of qcd, a grid that supports drag & drop
 class IndicSelectWindow(QDialog):
     def __init__(self, parent=None):
         super(IndicSelectWindow, self).__init__(parent=parent)
@@ -402,11 +462,12 @@ class IndicSelectWindow(QDialog):
         self.scrollArea.setWidget(self.scrollAreaWidgetContents)
         self.layout.addWidget(self.scrollArea)
 
-        # Go through the grid and initalize values
-        skipThis = [-1, -1] # For multiqubit gates, skip initalizing covered positions
+        # Go through the grid and initialize values
+        # For multiqubit gates, skip initializing covered positions
+        skipThis = [-1, -1]
         for j in range(1, offSetHorizontal + 1):
             for i in range(currentHeight):
-                if(skipThis[0] == i and skipThis[1] == j):
+                if (skipThis[0] == i and skipThis[1] == j):
                     grid[i][j - 1] = " "
                     break
                 grid[i][j-1] = " "
@@ -419,20 +480,23 @@ class IndicSelectWindow(QDialog):
                 self.figure = Figure()  # a figure to plot on
                 self.canvas = FigureCanvas(self.figure)
                 self.ax = self.figure.add_subplot(111)  # create an axis
-                if(j == offSetHorizontal):  # If we need to create the barrier
+                if (j == offSetHorizontal):  # If we need to create the barrier
                     self.Frame.setStyleSheet("background-color: grey;")
                     Box = QVBoxLayout()
                     Box.addWidget(self.Frame)
                     self.gridLayout.addLayout(Box, i, j-1, len(grid)-2, 1)
                     global priorBarrier
                     priorBarrier = [i, j - 1, len(grid)-2, 1]
-                else: # If we are adding just a gate
+                else:  # If we are adding just a gate
                     global customGates
-                    grid[i][j - 1] = inital(i, j - 1) # Find what gate if any should go in position
-                    if(grid[i][j - 1] in customGates):
-                        self.ax.text(0.5, 0.5, grid[i][j - 1], horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
+                    # Find what gate if any should go in position
+                    grid[i][j - 1] = initial(i, j - 1)
+                    if (grid[i][j - 1] in customGates):
+                        self.ax.text(0.5, 0.5, grid[i][j - 1], horizontalalignment='center',
+                                     verticalalignment='center', transform=self.ax.transAxes)
                     else:
-                        self.ax.imshow(gateToImage[grid[i][j - 1]]) # Show the gate
+                        # Show the gate
+                        self.ax.imshow(gateToImage[grid[i][j - 1]])
                     self.ax.set_axis_off()
                     self.canvas.draw()  # refresh canvas
                     self.layout.addWidget(self.canvas)
@@ -440,7 +504,7 @@ class IndicSelectWindow(QDialog):
                     Box = QVBoxLayout()
                     Box.addWidget(self.Frame)
                     self.gridLayout.addLayout(Box, i, j - 1)
-        # Go through and initalize field user interacts with
+        # Go through and initialize field user interacts with
         for i in range(offSetHorizontal, currentWidth + offSetHorizontal):
             for j in range(currentHeight):
                 grid[j][i] = "-"
@@ -495,7 +559,8 @@ class IndicSelectWindow(QDialog):
             self.figure = Figure()  # a figure to plot on
             self.canvas = FigureCanvas(self.figure)
             self.ax = self.figure.add_subplot(111)  # create an axis
-            row, col, _, _ = self.gridLayout.getItemPosition(self.get_index(event.windowPos().toPoint()))
+            row, col, _, _ = self.gridLayout.getItemPosition(
+                self.get_index(event.windowPos().toPoint()))
             self.ax.imshow(grid[row][col])
             self.canvas.draw()  # refresh canvas
             self.canvas.installEventFilter(self)
@@ -540,21 +605,23 @@ class IndicSelectWindow(QDialog):
                     self.figure = Figure()  # a figure to plot on
                     self.canvas = FigureCanvas(self.figure)
                     self.ax = self.figure.add_subplot(111)  # create an axis
-                    if((j, i) not in positionsWithCustomGates and (j, i) not in skip):
+                    if ((j, i) not in positionsWithCustomGates and (j, i) not in skip):
                         if (grid[j][i] not in customGates):
                             self.ax.imshow(gateToImage[grid[j][i]])
                         else:
-                            self.ax.text(0.5, 0.5, grid[j][i], horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
+                            self.ax.text(0.5, 0.5, grid[j][i], horizontalalignment='center',
+                                         verticalalignment='center', transform=self.ax.transAxes)
                         self.ax.set_axis_off()
                         self.canvas.draw()  # refresh canvas
                         self.canvas.installEventFilter(self)
                         self.layout.addWidget(self.canvas)
                         Box = QVBoxLayout()
                         Box.addWidget(self.Frame)
-                        self.gridLayout.removeItem(self.gridLayout.itemAtPosition(j, i))
+                        self.gridLayout.removeItem(
+                            self.gridLayout.itemAtPosition(j, i))
                         self.gridLayout.addLayout(Box, j, i)
                     else:
-                        if((j, i) not in skip):
+                        if ((j, i) not in skip):
                             name = positionsWithCustomGates[(j, i)]
                             self.ax.set_axis_off()
                             self.canvas.draw()  # refresh canvas
@@ -562,11 +629,13 @@ class IndicSelectWindow(QDialog):
                             self.layout.addWidget(self.canvas)
                             Box = QVBoxLayout()
                             Box.addWidget(self.Frame)
-                            self.gridLayout.addLayout(Box, j, i, len(customGates[name][0]), len(customGates[name][1]))
+                            self.gridLayout.addLayout(Box, j, i, len(
+                                customGates[name][0]), len(customGates[name][1]))
                             for x in range(len(customGates[name][0])):
                                 for y in range(len(customGates[name][1])):
                                     skip.add((j + x, i + y))
-                                    self.gridLayout.removeItem(self.gridLayout.itemAtPosition(j + x, i + y))
+                                    self.gridLayout.removeItem(
+                                        self.gridLayout.itemAtPosition(j + x, i + y))
 
     # If releasing, event on drag and drop occured, so neglect this gate
     def mouseReleaseEvent(self, event):
@@ -595,17 +664,21 @@ class IndicSelectWindow(QDialog):
             global photonicMode
             if (photonicMode == True):
                 val1, val2 = 0.0, 0.0
-                val1 = QtWidgets.QInputDialog.getDouble(self, 'First Gate Argument', 'Input:')[0]
-                val2 = QtWidgets.QInputDialog.getDouble(self, 'Second Gate Argument', 'Input:')[0]
+                val1 = QInputDialog.getDouble(
+                    self, 'First Gate Argument', 'Input:')[0]
+                val2 = QInputDialog.getDouble(
+                    self, 'Second Gate Argument', 'Input:')[0]
                 global designer
                 global offSetHorizontal
                 # Specify the gate properties
-                designer.settings.specialGridSettings[(col2-offSetHorizontal,row2)] = [val1, val2]
+                designer.settings.specialGridSettings[(
+                    col2-offSetHorizontal, row2)] = [val1, val2]
                 print(designer.settings.specialGridSettings)
 
-            p1, p2 = self.gridLayout.getItemPosition(self.target), self.gridLayout.getItemPosition(source)
+            p1, p2 = self.gridLayout.getItemPosition(
+                self.target), self.gridLayout.getItemPosition(source)
             # If we are moving a point on the user board, replace positions
-            if(self.gridLayout.getItemPosition(self.target)[1] < offSetHorizontal):
+            if (self.gridLayout.getItemPosition(self.target)[1] < offSetHorizontal):
                 designer.giveGUIGrid(grid)
                 f = tempfile.NamedTemporaryFile(delete=False)
                 designer.saveSimulationToFile(f.name)
@@ -619,13 +692,14 @@ class IndicSelectWindow(QDialog):
                 self.canvas = FigureCanvas(self.figure)
                 self.ax = self.figure.add_subplot(111)  # create an axis
                 isCustom = False
-                if(inital(row, col) not in customGates):
-                    self.ax.imshow(gateToImage[inital(row, col)])
+                if (initial(row, col) not in customGates):
+                    self.ax.imshow(gateToImage[initial(row, col)])
                 else:
-                    self.ax.text(0.5, 0.5, inital(row, col), horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
+                    self.ax.text(0.5, 0.5, initial(row, col), horizontalalignment='center',
+                                 verticalalignment='center', transform=self.ax.transAxes)
                     isCustom = True
                     print("Dropped Custom (Drag and Drop)")
-                if((row, col) in positionsWithCustomGates):
+                if ((row, col) in positionsWithCustomGates):
                     isCustom = True
                     grid[row][col]
                 self.ax.set_axis_off()
@@ -635,45 +709,51 @@ class IndicSelectWindow(QDialog):
                 Box = QVBoxLayout()
                 Box.addWidget(self.Frame)
                 self.gridLayout.takeAt(source)
-                if(isCustom):
+                if (isCustom):
                     print("Calling updateGUILayout")
                     grid[row2][col2] = grid[row][col]
                     self.updateGUILayout()
                 else:
-                    self.gridLayout.addLayout(Box, row2, col2) #row2, col2
+                    self.gridLayout.addLayout(Box, row2, col2)  # row2, col2
                     grid[row2][col2] = grid[row][col]
-            else: # Else, ONLY move the gate in the user board
+            else:  # Else, ONLY move the gate in the user board
                 isCustom = False
-                if((row, col) in positionsWithCustomGates):
+                if ((row, col) in positionsWithCustomGates):
                     name = positionsWithCustomGates[(row, col)]
                     for x in range(len(customGates[name][0])):
                         for y in range(len(customGates[name][1])):
                             grid[row + x][col + y] = "-"
-                            self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row + x, col + y))
+                            self.gridLayout.removeItem(
+                                self.gridLayout.itemAtPosition(row + x, col + y))
                     grid[row][col] = name
-                    self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row, col))
+                    self.gridLayout.removeItem(
+                        self.gridLayout.itemAtPosition(row, col))
                     del positionsWithCustomGates[(row, col)]
                     isCustom = True
-                if((row2, col2) in positionsWithCustomGates):
+                if ((row2, col2) in positionsWithCustomGates):
                     name = positionsWithCustomGates[(row2, col2)]
                     for x in range(len(customGates[name][0])):
                         for y in range(len(customGates[name][1])):
                             grid[row2 + x][col2 + y] = "-"
-                            self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row2 + x, col2 + y))
+                            self.gridLayout.removeItem(
+                                self.gridLayout.itemAtPosition(row2 + x, col2 + y))
                     grid[row2][col2] = name
-                    self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row2, col2))
+                    self.gridLayout.removeItem(
+                        self.gridLayout.itemAtPosition(row2, col2))
                     del positionsWithCustomGates[(row2, col2)]
                     isCustom = True
                 grid[row][col], grid[row2][col2] = grid[row2][col2], grid[row][col]
-                if(isCustom):
+                if (isCustom):
                     print("Calling updateGUILayout")
                     self.canvas.draw()
                     self.updateGUILayout()
                 else:
                     tempA = self.gridLayout.itemAtPosition(row, col)
                     tempB = self.gridLayout.itemAtPosition(row2, col2)
-                    self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row, col))
-                    self.gridLayout.removeItem(self.gridLayout.itemAtPosition(row2, col2))
+                    self.gridLayout.removeItem(
+                        self.gridLayout.itemAtPosition(row, col))
+                    self.gridLayout.removeItem(
+                        self.gridLayout.itemAtPosition(row2, col2))
                     self.gridLayout.addItem(tempA, *p2)
                     self.gridLayout.addItem(tempB, *p1)
 
@@ -686,22 +766,22 @@ class IndicSelectWindow(QDialog):
             for depth in range(3*(numDepth+1)):
                 entry += "-"
             print(entry)
-            starredPositions = {(-1,-1)}
+            starredPositions = {(-1, -1)}
             for qubit in range(numQubits):
                 tempStr = ""
                 nextOne = False
                 for depth in range(offSetHorizontal, numDepth + offSetHorizontal):
-                    if((qubit, depth) in starredPositions):
+                    if ((qubit, depth) in starredPositions):
                         tempStr += "[*]"
                     else:
                         tempStr += "[" + grid[qubit][depth] + "]"
-                    if(len(grid[qubit][depth]) >= 3 and "PP" not in grid[qubit][depth]):
+                    if (len(grid[qubit][depth]) >= 3 and "PP" not in grid[qubit][depth]):
                         starredPositions.add((qubit + 1, depth))
                 tempStr += "[M]"
                 print(tempStr)
             print(entry)
 
-    #update layout basesd on designer class' grid
+    # update layout basesd on designer class' grid
     def updateGUILayout(self):
         global priorBarrier
         global offSetHorizontal
@@ -710,12 +790,12 @@ class IndicSelectWindow(QDialog):
         global customGates
         global positionsWithCustomGates
         global currentWidth
-        # Basically a repeat from GUI initalization, see those comments for explainations
+        # Basically a repeat from GUI initialization, see those comments for explainations
         skipThis = [-1, -1]
         print("Is this it?")
         for j in range(1, offSetHorizontal + 1):
             for i in range(currentHeight):
-                if(skipThis[0] == i and skipThis[1] == j):
+                if (skipThis[0] == i and skipThis[1] == j):
                     grid[i][j - 1] = "-"
                     break
                 grid[i][j-1] = "-"
@@ -728,18 +808,19 @@ class IndicSelectWindow(QDialog):
                 self.figure = Figure()  # a figure to plot on
                 self.canvas = FigureCanvas(self.figure)
                 self.ax = self.figure.add_subplot(111)  # create an axis
-                if(j == offSetHorizontal):
+                if (j == offSetHorizontal):
                     self.Frame.setStyleSheet("background-color: grey;")
                     Box = QVBoxLayout()
                     Box.addWidget(self.Frame)
                     self.gridLayout.addLayout(Box, i, j-1, len(grid)-2, 1)
                     priorBarrier = [i, j-1, len(grid)-2, 1]
                 else:
-                    grid[i][j - 1] = inital(i, j - 1)
-                    if(grid[i][j - 1] not in customGates):
+                    grid[i][j - 1] = initial(i, j - 1)
+                    if (grid[i][j - 1] not in customGates):
                         self.ax.imshow(gateToImage[grid[i][j - 1]])
                     else:
-                        self.ax.text(0.5, 0.5, grid[j][i-1], horizontalalignment='center', verticalalignment='center',transform=self.ax.transAxes)
+                        self.ax.text(0.5, 0.5, grid[j][i-1], horizontalalignment='center',
+                                     verticalalignment='center', transform=self.ax.transAxes)
                     self.ax.set_axis_off()
                     self.canvas.draw()  # refresh canvas
                     self.layout.addWidget(self.canvas)
@@ -760,12 +841,13 @@ class IndicSelectWindow(QDialog):
                 self.ax = self.figure.add_subplot(111)  # create an axis
                 isCustom = False
                 name = "NA"
-                if(grid[j][i] not in customGates and (j, i) not in positionsWithCustomGates):
+                if (grid[j][i] not in customGates and (j, i) not in positionsWithCustomGates):
                     self.ax.imshow(gateToImage[grid[j][i]])
                 else:
-                    if((j, i) not in positionsWithCustomGates):
+                    if ((j, i) not in positionsWithCustomGates):
                         self.Frame.setStyleSheet("background-color: black;")
-                        self.ax.text(0.2, 0.75, grid[j][i], horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
+                        self.ax.text(0.2, 0.75, grid[j][i], horizontalalignment='center',
+                                     verticalalignment='center', transform=self.ax.transAxes)
                         self.ax.imshow(gateToImage[" "])
                         isCustom = True
                         print("Custom Detected")
@@ -775,9 +857,11 @@ class IndicSelectWindow(QDialog):
                         for x in range(len(customGates[name][0])):
                             for y in range(len(customGates[name][1])):
                                 skip.append((j + x, i + y))
-                                self.gridLayout.removeItem(self.gridLayout.itemAtPosition(j + x, i + y))
-                        self.gridLayout.addLayout(Box, j, i, len(customGates[name][0]), len(customGates[name][1]))
-                if((j, i) in skip):
+                                self.gridLayout.removeItem(
+                                    self.gridLayout.itemAtPosition(j + x, i + y))
+                        self.gridLayout.addLayout(Box, j, i, len(
+                            customGates[name][0]), len(customGates[name][1]))
+                if ((j, i) in skip):
                     self.ax.imshow(gateToImage[" "])
                     self.Frame.setStyleSheet("background-color: black;")
                 self.ax.set_axis_off()
@@ -786,10 +870,11 @@ class IndicSelectWindow(QDialog):
                 self.layout.addWidget(self.canvas)
                 Box = QVBoxLayout()
                 Box.addWidget(self.Frame)
-                if(not isCustom):
+                if (not isCustom):
                     self.gridLayout.addLayout(Box, j, i)
                 else:
-                    self.gridLayout.addLayout(Box, j, i, len(customGates[name][0]), len(customGates[name][1]))
+                    self.gridLayout.addLayout(Box, j, i, len(
+                        customGates[name][0]), len(customGates[name][1]))
                     for x in range(len(customGates[name][0])):
                         for y in range(len(customGates[name][1])):
                             grid[j+x][i+y] = (customGates[name])[x][y]
@@ -798,7 +883,7 @@ class IndicSelectWindow(QDialog):
         print("UPDATED-------------------")
 
 
-#the main window for display
+# the main window for display
 class Window(QMainWindow):
     def __init__(self, parent=None):
         super(Window, self).__init__(parent)
@@ -809,7 +894,7 @@ class Window(QMainWindow):
         background = QComboBox()
         background.addItems(QStyleFactory.keys())
 
-        #top menu bar for operations
+        # top menu bar for operations
         menu = self.menuBar()
         file_menu = QMenu("&File", self)
         menu.addMenu(file_menu)
@@ -822,19 +907,24 @@ class Window(QMainWindow):
 
         button_custom_gate = QAction("&Custom Gate Creation", self)
         menu.addAction(button_custom_gate)
-        #self.custom_gate_tab = CustomGateTab(self)
-        #button_custom_gate.triggered.connect(lambda: self.makeCustomGate())
+        # self.custom_gate_tab = CustomGateTab(self)
+        # button_custom_gate.triggered.connect(lambda: self.makeCustomGate())
 
-        #intialize dwave tab for user input
+        # intialize dwave tab for user input
         self.dwave_tab = DWaveTab(self)
-        button_dwave.triggered.connect(lambda: self.showDWaveTab())
-        #other menu bars
+        button_dwave.triggered.connect(self.showDWaveTab)
+        # other menu bars
+
+        button_demo = QAction("&Demo", self)
+        menu.addAction(button_demo)
+        button_demo.triggered.connect(self.activateDemo)
+
         button_exit = QAction("&Exit", self)
         menu.addAction(button_exit)
-        #additional exit button (why not)
+        # additional exit button (why not)
         button_exit.triggered.connect(lambda: self.closeEvent(parent))
 
-        #file I/O actions
+        # file I/O actions
         save = QAction("&Save", self)
         load = QAction("&Load", self)
         email = QAction("&Email", self)
@@ -845,26 +935,26 @@ class Window(QMainWindow):
         file_menu.addAction(email)
         file_menu.addAction(undo)
         file_menu.addAction(redo)
-        save.triggered.connect(lambda: self.saveFile())
-        load.triggered.connect(lambda: self.loadFile())
-        email.triggered.connect(lambda: self.emailFile())
-        undo.triggered.connect(lambda: self.undo())
-        redo.triggered.connect(lambda: self.redo())
+        save.triggered.connect(self.saveFile)
+        load.triggered.connect(self.loadFile)
+        email.triggered.connect(self.emailFile)
+        undo.triggered.connect(self.undo)
+        redo.triggered.connect(self.redo)
 
-        #create simulation settings layout and running layout
+        # create simulation settings layout and running layout
         self.createSimulationSetting()
         self.createSimulationRunning()
 
-        #right side toolbar to hold simulation settings
+        # right side toolbar to hold simulation settings
         setting = QToolBar()
         setting.addWidget(self.SimulationChoice)
         setting.addWidget(self.SimulationSetting)
         self.addToolBar(Qt.RightToolBarArea, setting)
 
-        #display grid as central widget
+        # display grid as central widget
         self.setCentralWidget(self.grid)
 
-        #set fixed size for drag & drop precision
+        # set fixed size for drag & drop precision
         self.setWindowTitle("Designer")
         self.changeStyle('fusion')
 
@@ -873,8 +963,9 @@ class Window(QMainWindow):
         designer.giveGUIGrid(grid)
         designer.runSimulation()
         designer.saveSimulationToFile("email.qc")
-        address = QtWidgets.QInputDialog.getText(self, 'Email Address', 'Email Address:')[0]
-        subjectLine = QtWidgets.QInputDialog.getText(self, 'Subject', 'Subject:')[0]
+        address = QInputDialog.getText(
+            self, 'Email Address', 'Email Address:')[0]
+        subjectLine = QInputDialog.getText(self, 'Subject', 'Subject:')[0]
         gmail.send(
             subject=subjectLine,
             receivers=[address],
@@ -885,16 +976,15 @@ class Window(QMainWindow):
         )
         print("Email Sent!")
 
-
     def saveFile(self):
-        path=QFileDialog.getSaveFileName(self, "Choose Directory","E:\\")
-        #print(path[0] + ".qc")
+        path = QFileDialog.getSaveFileName(self, "Choose Directory", "E:\\")
+        # print(path[0] + ".qc")
         designer.giveGUIGrid(grid)
         designer.runSimulation()
         designer.saveSimulationToFile(path[0] + ".qc")
 
     def loadFile(self):
-        dir_path=QFileDialog.getOpenFileName(self, "Choose .qc file","E:\\")
+        dir_path = QFileDialog.getOpenFileName(self, "Choose .qc file", "E:\\")
         print(dir_path[0])
         designer.loadSimulationFromFile(dir_path[0])
         updateGrid()
@@ -922,13 +1012,13 @@ class Window(QMainWindow):
         updateGrid()
         designer.printDesign()
 
+    # override close event to make sure pop-up window will close when
+    # main window is close, otherwise a not-responding pop-up will remain
+    # after main window is closed
 
-    #override close event to make sure pop-up window will close when
-    #main window is close, otherwise a not-responding pop-up will remain
-    #after main window is closed
     def closeEvent(self, event):
         if (self.dwave_tab):
-            self.dwave_tab.close()           
+            self.dwave_tab.close()
         self.close()
         for f in undoStack:
             try:
@@ -948,7 +1038,7 @@ class Window(QMainWindow):
     def changePalette(self):
         QApplication.setPalette(self.originalPalette)
 
-    #create interface for running simulation
+    # create interface for running simulation
     def createSimulationRunning(self):
         self.SimulationChoice = QGroupBox("Simulation Actions")
         button1 = QPushButton()
@@ -971,23 +1061,23 @@ class Window(QMainWindow):
         layout.addStretch(1)
         self.SimulationChoice.setLayout(layout)
 
-    #a function that changes setting file and backend based on user's choice
+    # a function that changes setting file and backend based on user's choice
     def updateSimulationTechnique(self, i):
-        if("H" in self.sim_box.currentText() and "u" not in self.sim_box.currentText()):
+        if ("H" in self.sim_box.currentText() and "u" not in self.sim_box.currentText()):
             changeSimulationTechniqueHamiltonian()
-        elif("H" in self.sim_box.currentText()):
+        elif ("H" in self.sim_box.currentText()):
             changeSimulationTechniqueHamiltonianCuQuantum()
-        elif("F" in self.sim_box.currentText()):
+        elif ("F" in self.sim_box.currentText()):
             changeSimulationTechniqueFeynman()
-        elif("D" in self.sim_box.currentText()):
+        elif ("D" in self.sim_box.currentText()):
             if self.external_sim_msg.msg_toggle:
                 self.external_sim_msg.exec()
             changeSimulationTechniqueDWave()
-        elif("Q" in self.sim_box.currentText()):
+        elif ("Q" in self.sim_box.currentText()):
             if self.external_sim_msg.msg_toggle:
                 self.external_sim_msg.exec()
             changeSimulationTechniqueQiskit()
-        elif("X" in self.sim_box.currentText()):
+        elif ("X" in self.sim_box.currentText()):
             if self.external_sim_msg.msg_toggle:
                 self.external_sim_msg.exec()
             changeSimulationTechniqueXanadu()
@@ -996,41 +1086,41 @@ class Window(QMainWindow):
                 self.external_sim_msg.exec()
             changeSimulationTechniqueIBM()
 
-    #a function that allows user to set external backend warning msg off
+    # a function that allows user to set external backend warning msg off
     def externalMsgToggle(self, pushed):
         if (pushed.text() == "Ignore"):
-            self.external_sim_msg.msg_toggle = False;
+            self.external_sim_msg.msg_toggle = False
 
-    #create interface for simulation settings
+    # create interface for simulation settings
     def createSimulationSetting(self):
         self.SimulationSetting = QGroupBox("Simulation Setting")
 
         layout = QVBoxLayout()
-        #check box for measurement, setting will be updated once toggled
+        # check box for measurement, setting will be updated once toggled
         measurement = QCheckBox("Measurement")
         measurement.toggled.connect(self.TypeOnClicked)
         measurement.callsign = "measurement"
         layout.addWidget(measurement)
 
-        #check box for gate suggestion, setting will be updated once toggled
+        # check box for gate suggestion, setting will be updated once toggled
         gate_suggestion = QCheckBox("Gate Sugguestion")
         gate_suggestion.toggled.connect(self.TypeOnClicked)
         gate_suggestion.callsign = "suggestion"
         layout.addWidget(gate_suggestion)
 
-        #check box for incremental saving, setting will be updated once toggled
+        # check box for incremental saving, setting will be updated once toggled
         incremental_saving = QCheckBox("Incremental Saving")
         incremental_saving.toggled.connect(self.TypeOnClicked)
         layout.addWidget(incremental_saving)
         incremental_saving.callsign = "incresav"
 
-        #check box for incremental simulation, setting will be updated once toggled
+        # check box for incremental simulation, setting will be updated once toggled
         incremental_simulation = QCheckBox("Incremental Simulation")
         incremental_simulation.toggled.connect(self.TypeOnClicked)
         layout.addWidget(incremental_simulation)
         incremental_simulation.callsign = "incresim"
 
-        #check box for photonic mode, setting will be updated once toggled
+        # check box for photonic mode, setting will be updated once toggled
         photonicMode = QCheckBox("Photonic Mode")
         photonicMode.toggled.connect(self.TypeOnClicked)
         layout.addWidget(photonicMode)
@@ -1062,25 +1152,30 @@ class Window(QMainWindow):
         width_label = QLabel("&Width: ")
         num_width.valueChanged.connect(self.UpdateParameters)
 
-        #a message box that tells user external backend has been selected
-        #'ignore' button has been overriden so that
-        #click on it will let message never pop-up again
+        # a message box that tells user external backend has been selected
+        # 'ignore' button has been overriden so that
+        # click on it will let message never pop-up again
         self.external_sim_msg = QMessageBox()
         self.external_sim_msg.setIcon(QMessageBox.Information)
         self.external_sim_msg.setWindowTitle("External backend")
-        self.external_sim_msg.setStandardButtons(QMessageBox.Ok | QMessageBox.Ignore)
-        #message on display
-        self.external_sim_msg.setText("You have chosen an external backend. QCD will now run your circuit design on an external backend.")
-        self.external_sim_msg.setInformativeText("Some external backend have different behaviors when accepting input. You can access their features via the menu bar. ")
-        self.external_sim_msg.msg_toggle = True;
+        self.external_sim_msg.setStandardButtons(
+            QMessageBox.Ok | QMessageBox.Ignore)
+        # message on display
+        self.external_sim_msg.setText(
+            "You have chosen an external backend. QCD will now run your circuit design on an external backend.")
+        self.external_sim_msg.setInformativeText(
+            "Some external backend have different behaviors when accepting input. You can access their features via the menu bar. ")
+        self.external_sim_msg.msg_toggle = True
         self.external_sim_msg.buttonClicked.connect(self.externalMsgToggle)
 
         # Simulation selection panel
         Simulation = QLabel("Simulation Technique")
-        sim_selection = ["Hamiltionian", "Hamiltonian CuQuantum", "Feynman", "DWave Ocean", "Qiskit", "Xanadu"]
+        sim_selection = ["Hamiltionian", "Hamiltonian CuQuantum",
+                         "Feynman", "DWave Ocean", "Qiskit", "Xanadu"]
         self.sim_box = QComboBox()
         self.sim_box.addItems(sim_selection)
-        self.sim_box.currentIndexChanged.connect(self.updateSimulationTechnique)
+        self.sim_box.currentIndexChanged.connect(
+            self.updateSimulationTechnique)
 
         layout.addWidget(Simulation)
         layout.addWidget(self.sim_box)
@@ -1096,7 +1191,7 @@ class Window(QMainWindow):
         layout.addStretch(1)
         self.SimulationSetting.setLayout(layout)
 
-    #integration function that connects checkboxs on gui to backend
+    # integration function that connects checkboxs on gui to backend
     def TypeOnClicked(self):
         Button = self.sender()
         designer.settings.measurement = Button.isChecked()
@@ -1118,7 +1213,8 @@ class Window(QMainWindow):
             global currentHeight
             photonicMode = not photonicMode
             offSetHorizontal = 5
-            grid = [["-" for i in range(currentWidth + offSetHorizontal)] for j in range(currentHeight)]
+            grid = [["-" for i in range(currentWidth + offSetHorizontal)]
+                    for j in range(currentHeight)]
             global needToUpdate
             needToUpdate = False
             forceUpdate()
@@ -1135,23 +1231,24 @@ class Window(QMainWindow):
             forceUpdate()
 
     def makeCustomGate(self):
-        x1 = QtWidgets.QInputDialog.getInt(self, 'X1', 'Input:')
+        x1 = QInputDialog.getInt(self, 'X1', 'Input:')
         if (x1[1] == True):
             print(x1[0])
-            x2 = QtWidgets.QInputDialog.getInt(self, 'X2', 'Input:')
+            x2 = QInputDialog.getInt(self, 'X2', 'Input:')
             if (x2[1] == True):
                 print(x2[0])
-                y1 = QtWidgets.QInputDialog.getInt(self, 'Y1', 'Input:')
+                y1 = QInputDialog.getInt(self, 'Y1', 'Input:')
                 if (y1[1] == True):
                     print(y1[0])
-                    y2 = QtWidgets.QInputDialog.getInt(self, 'Y2', 'Input:')
+                    y2 = QInputDialog.getInt(self, 'Y2', 'Input:')
                     if (y2[1] == True):
                         print(y2[0])
 
         print(grid[y1[0]][x1[0] + offSetHorizontal])
         print(grid[y2[0]][x2[0] + offSetHorizontal])
 
-        customGrid = [["-" for i in range(x2[0]-x1[0]+1)] for j in range(y2[0]-y1[0]+1)]
+        customGrid = [["-" for i in range(x2[0]-x1[0]+1)]
+                      for j in range(y2[0]-y1[0]+1)]
 
         xItr = 0
         yItr = 0
@@ -1159,9 +1256,10 @@ class Window(QMainWindow):
             for j in range(x1[0], x2[0] + 1):
                 customGrid[i-y1[0]][j-x1[0]] = grid[i][j+offSetHorizontal]
 
-        customGateName = QtWidgets.QInputDialog.getText(self, 'Custom Gate Name', 'Input:')
+        customGateName = QInputDialog.getText(
+            self, 'Custom Gate Name', 'Input:')
         print(customGateName)
-        if(customGateName[1] == False):
+        if (customGateName[1] == False):
             return
 
         customGates[customGateName[0]] = customGrid
@@ -1178,12 +1276,19 @@ class Window(QMainWindow):
 
         print(customGates)
 
-    #let Dwave input tab show when user clicks on toolbar
+    # let Dwave input tab show when user clicks on toolbar
     def showDWaveTab(self):
         self.dwave_tab.show()
 
+    # When the button is clicked, QuantumVQEDemo.py will be run.
+    def activateDemo(self):
+        try:
+            subprocess.Popen(['python3', 'QuantumVQEDemo.py'])
+        except Exception as e:
+            print(f'Cannot open QuantumVQEDemo.py: {e}')
 
-#a Qdialog that pops up when use clicks the 'DWave' button on toolbar
+
+# a Qdialog that pops up when use clicks the 'DWave' button on toolbar
 class DWaveTab(QDialog):
     def __init__(self, parent=Window):
         super(DWaveTab, self).__init__(parent=parent)
@@ -1207,7 +1312,8 @@ class DWaveTab(QDialog):
         # Various grid elements necessary for extracting necessary information for optimization problem
         self.tab_addvar.layout = QVBoxLayout(self)
         self.dwave_var = QTextEdit()
-        self.dwave_var.setPlaceholderText("Add your variable here. (i.e. 'a = Binary(\"a\")')\n")
+        self.dwave_var.setPlaceholderText(
+            "Add your variable here. (i.e. 'a = Binary(\"a\")')\n")
         self.tab_addvar.layout.addWidget(self.dwave_var)
         self.tab_addvar.setLayout(self.tab_addvar.layout)
 
@@ -1219,7 +1325,8 @@ class DWaveTab(QDialog):
 
         self.tab_addobj.layout = QVBoxLayout(self)
         self.dwave_obj = QLineEdit()
-        self.dwave_obj.setPlaceholderText("Set your objective here. (i.e. 'max ((a + b)*e + (c + d))\n")
+        self.dwave_obj.setPlaceholderText(
+            "Set your objective here. (i.e. 'max ((a + b)*e + (c + d))\n")
         self.tab_addobj.layout.addWidget(self.dwave_obj)
         self.tab_addobj.setLayout(self.tab_addobj.layout)
 
@@ -1246,7 +1353,8 @@ class DWaveTab(QDialog):
         DWaveCon = self.dwave_con.toPlainText()
         DwaveObjective = self.dwave_obj.text()
         self.close()
-        
+
+
 class PartialSimulationTab(QDialog):
     def __init__(self, parent=Window):
         super(PartialSimulationTab, self).__init__()
@@ -1266,16 +1374,19 @@ class PartialSimulationTab(QDialog):
 
         self.tab_addvar.layout = QVBoxLayout(self)
         self.dwave_var = QTextEdit()
-        self.dwave_var.setPlaceholderText("Add your bitstrings here seperated by a newline")
+        self.dwave_var.setPlaceholderText(
+            "Add your bitstrings here seperated by a newline")
         self.tab_addvar.layout.addWidget(self.dwave_var)
         self.tab_addvar.setLayout(self.tab_addvar.layout)
 
         self.tab_addobj.layout = QVBoxLayout(self)
-        #self.tab_addobj.layout.addWidget(self.dwave_obj)
-        self.gateCheckBox = QCheckBox("Gate Split Reduce (only if large tensors)")
+        # self.tab_addobj.layout.addWidget(self.dwave_obj)
+        self.gateCheckBox = QCheckBox(
+            "Gate Split Reduce (only if large tensors)")
         self.tab_addobj.layout.addWidget(self.gateCheckBox)
         self.gateCheckBox.setChecked(False)
-        self.gateCheckBox.stateChanged.connect(lambda: self.click(self.gateCheckBox))
+        self.gateCheckBox.stateChanged.connect(
+            lambda: self.click(self.gateCheckBox))
         self.lineSVDCutoff = QLineEdit(self)
         self.lineSVDCutoff.setPlaceholderText("SVD Cutoff Absolute")
         self.tab_addobj.layout.addWidget(self.lineSVDCutoff)
@@ -1294,9 +1405,9 @@ class PartialSimulationTab(QDialog):
         global cuQuantumBitStrings
         global cuQuantumConfig
         cuQuantumBitStrings = self.dwave_var.toPlainText()
-        if(len(self.lineSVDCutoff.text()) > 0):
+        if (len(self.lineSVDCutoff.text()) > 0):
             cuQuantumConfig[0] = float(self.lineSVDCutoff.text())
-        if(len(self.lineSVDCutoffTrunc.text()) > 0):
+        if (len(self.lineSVDCutoffTrunc.text()) > 0):
             cuQuantumConfig[1] = float(self.lineSVDCutoffTrunc.text())
         self.close()
 
@@ -1304,19 +1415,20 @@ class PartialSimulationTab(QDialog):
         global cuQuantumBitStrings
         global cuQuantumConfig
         cuQuantumBitStrings = self.dwave_var.toPlainText()
-        if(len(self.lineSVDCutoff.text()) > 0):
+        if (len(self.lineSVDCutoff.text()) > 0):
             cuQuantumConfig[0] = float(self.lineSVDCutoff.text())
-        if(len(self.lineSVDCutoffTrunc.text()) > 0):
+        if (len(self.lineSVDCutoffTrunc.text()) > 0):
             cuQuantumConfig[1] = float(self.lineSVDCutoffTrunc.text())
         self.close()
-        
+
     def click(self, checkBox):
         global cuQuantumGateSplit
-        if(checkBox.isChecked()):
+        if (checkBox.isChecked()):
             cuQuantumGateSplit = 1
         else:
             cuQuantumGateSplit = 0
-        
+
+
 # Create the application, window, and close application if asked
 app = QApplication(sys.argv)
 cuQuantumTab = PartialSimulationTab()
