@@ -11,7 +11,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import os
 os.environ["DWAVE_API_TOKEN"] = "DEV-648f4916bfa0706429cbdd64b5e08c4847f505bd"
 
-def sample_and_plot(qubo_matrix):
+def sample_and_plot(qubo_matrix, graph_window):
     # Convert QUBO matrix to a dimod BQM (Binary Quadratic Model)
     linear = {v: qubo_matrix[v][v] for v in range(len(qubo_matrix))}
     quadratic = {(i, j): qubo_matrix[i][j] for i in range(len(qubo_matrix)) for j in range(i+1, len(qubo_matrix))}
@@ -28,14 +28,12 @@ def sample_and_plot(qubo_matrix):
     energies = [sample.energy for sample in sampleset.data()]
     fig, ax = plt.subplots()
 
-    dwave.inspector.storage.index_resolved_problems()
-    problem_id = list(dwave.inspector.storage.problemdata.keys())[0]
-    dwave.inspector.show(problem_id)
+    dwave.inspector.show(bqm, sampleset)
 
     # Take the lowest energy sample as our representative solution
     sample = sampleset.first.sample
-
-    # Create a NetworkX graph colored based on the solution
+    fig, ax = plt.subplots()    # Create a NetworkX graph colored based on the solution
+    
     G = nx.Graph()
     for i, value in sample.items():
         color = 'red' if value else 'blue'
@@ -49,8 +47,9 @@ def sample_and_plot(qubo_matrix):
     # Draw the graph
     colors = [data['color'] for _, data in G.nodes(data=True)]
 
-    nx.draw(G, with_labels=True, node_color=colors)
+    nx.draw(G, with_labels=True, node_color=colors, ax=ax)
     plt.show()
+    plt.figure(graph_window.number)
 
 class GraphWindow(QWidget):
     def __init__(self):
@@ -111,7 +110,7 @@ class GraphWindow(QWidget):
                 if i == j:
                     qubo_matrix[i][j] = h
                 else:
-                    qubo_matrix[i][j] = -J * adj_matrix[i][j]
+                    qubo_matrix[i][j] = J * adj_matrix[i][j]
 
         return qubo_matrix
 
@@ -119,15 +118,11 @@ class GraphWindow(QWidget):
         matrix = self.to_adjacency_matrix()
         if(1==1):
             qubo_matrix = self.ising_to_qubo(matrix, float(self.neighbor_strength_input.text()), float(self.field_strength_input.text()))
-            sample_and_plot(qubo_matrix)
-            self.__init__()
+            sample_and_plot(qubo_matrix, self.fig)
         else:
             print("Error: Failure to create Ising QUBO matrix...")
 
     def to_adjacency_matrix(self):
-        if(self.matrix != None):
-            return self.matrix
-
         n = len(self.nodes)
         matrix = [[0 for _ in range(n)] for _ in range(n)]
 
@@ -166,7 +161,7 @@ class GraphWindow(QWidget):
 
 app = QApplication(sys.argv)
 window = GraphWindow()
-window.setWindowTitle("Interactive Graph GUI")
+window.setWindowTitle("QUBO Demo GUI")
 window.resize(window.sizeHint())  # Adjust the size of the window to fit its content
 window.show()
 sys.exit(app.exec_())
