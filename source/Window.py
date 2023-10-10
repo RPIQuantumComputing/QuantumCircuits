@@ -1,4 +1,4 @@
-
+import os
 import tempfile
 import subprocess
 from PyQt5.QtCore import *
@@ -7,12 +7,30 @@ from PyQt5.QtWidgets import *
 from threading import *
 from pathlib import Path
 
+from DwaveTab import DWaveTab
+from IndicSelectWindow import IndicSelectWindow
+from PartialSimulationTab import PartialSimulationTab
+from DesignerGUI_new import GraphicsManager, GridManager, GateManager, SimulatorSettings, EmailManager
+from GUIHelper import GUIHelper
+
 # the main window for display
 class Window(QMainWindow):
-    def __init__(self, parent=None):
+    def __init__(self, 
+                 GraphM: GraphicsManager, 
+                 GridM : GridManager, 
+                 GateM: GateManager, 
+                 SS: SimulatorSettings,
+                 Email: EmailManager,
+                 parent=None):
         super(Window, self).__init__(parent)
 
-        self.grid = IndicSelectWindow()
+        self.GraphM = GraphM
+        self.GridM = GridM
+        self.GateM = GateM
+        self.SS = SS
+        self.Gmail = Email
+        self.cuQuantumTab = PartialSimulationTab()
+        self.grid = IndicSelectWindow(GraphM, GridM, GateM, SS)
         self.originalPalette = QApplication.palette()
 
         background = QComboBox()
@@ -83,13 +101,13 @@ class Window(QMainWindow):
         self.changeStyle('fusion')
 
     def emailFile(self):
-        designer.giveGUIGrid(grid)
-        designer.runSimulation()
-        designer.saveSimulationToFile("email.qc")
+        self.GridM.designer.giveGUIGrid(self.GridM.grid)
+        self.GridM.designer.runSimulation()
+        self.GridM.designer.saveSimulationToFile("email.qc")
         address = QInputDialog.getText(
             self, 'Email Address', 'Email Address:')[0]
         subjectLine = QInputDialog.getText(self, 'Subject', 'Subject:')[0]
-        gmail.send(
+        self.Gmail.gmail.send(
             subject=subjectLine,
             receivers=[address],
             text="Using the QuantumCircuit Open-Source Software!",
@@ -102,53 +120,53 @@ class Window(QMainWindow):
     def saveFile(self):
         path = QFileDialog.getSaveFileName(self, "Choose Directory", "E:\\")
         # print(path[0] + ".qc")
-        designer.giveGUIGrid(grid)
-        designer.runSimulation()
-        designer.saveSimulationToFile(path[0] + ".qc")
+        self.GridM.designer.giveGUIGrid(self.GridM.grid)
+        self.GridM.designer.runSimulation()
+        self.GridM.designer.saveSimulationToFile(path[0] + ".qc")
 
     def loadFile(self):
         dir_path = QFileDialog.getOpenFileName(self, "Choose .qc file", "E:\\")
         print(dir_path[0])
-        designer.loadSimulationFromFile(dir_path[0])
-        updateGrid()
-        designer.printDesign()
+        self.GridM.designer.loadSimulationFromFile(dir_path[0])
+        GUIHelper.updateGrid(self.GridM, self.SS)
+        self.GridM.designer.printDesign()
 
     def undo(self):
         f = tempfile.NamedTemporaryFile(delete=False)
-        designer.saveSimulationToFile(f.name)
-        redoStack.append(f.name)
+        self.GridM.designer.saveSimulationToFile(f.name)
+        self.GateM.redoStack.append(f.name)
         f.close()
-        f = undoStack.pop()
-        designer.loadSimulationFromFile(f)
+        f = self.GateM.undoStack.pop()
+        self.GridM.designer.loadSimulationFromFile(f)
         os.remove(f)
-        updateGrid()
-        designer.printDesign()
+        GUIHelper.updateGrid(self.GridM, self.SS)
+        self.GridM.designer.printDesign()
 
     def redo(self):
         f = tempfile.NamedTemporaryFile(delete=False)
-        designer.saveSimulationToFile(f.name)
-        undoStack.append(f.name)
+        self.GridM.designer.saveSimulationToFile(f.name)
+        self.GateM.undoStack.append(f.name)
         f.close()
-        f = redoStack.pop()
-        designer.loadSimulationFromFile(f)
+        f = self.GateM.redoStack.pop()
+        self.GridM.designer.loadSimulationFromFile(f)
         os.remove(f)
-        updateGrid()
-        designer.printDesign()
+        GUIHelper.updateGrid(self.GridM, self.SS)
+        self.GridM.designer.printDesign()
 
     # override close event to make sure pop-up window will close when
     # main window is close, otherwise a not-responding pop-up will remain
     # after main window is closed
 
-    def closeEvent(self):
+    def closeEvent(self, event):
         if (self.dwave_tab):
             self.dwave_tab.close()
         self.close()
-        for f in undoStack:
+        for f in self.GateM.undoStack:
             try:
                 os.remove(f)
             except:
                 pass
-        for f in redoStack:
+        for f in self.GateM.redoStack:
             try:
                 os.remove(f)
             except:
@@ -166,16 +184,16 @@ class Window(QMainWindow):
         self.SimulationChoice = QGroupBox("Simulation Actions")
         button1 = QPushButton()
         button1.setText("Run")
-        button1.clicked.connect(runSimulation)
+        button1.clicked.connect(lambda: GUIHelper.runSimulation(self.GraphM, self.GridM, self.SS))
         button2 = QPushButton()
         button2.setText("Data Diagram")
-        button2.clicked.connect(dataDiagramVisualization)
+        button2.clicked.connect(lambda: GUIHelper.dataDiagramVisualization(self.GridM))
         button3 = QPushButton()
         button3.setText("LL(1) Grid Parser")
-        button3.clicked.connect(showParseGrid)
+        button3.clicked.connect(GUIHelper.showParseGrid)
         button4 = QPushButton()
         button4.setText("Tensor Network Diagram")
-        button4.clicked.connect(showTensorNetwork)
+        button4.clicked.connect(GUIHelper.showTensorNetwork)
         layout = QVBoxLayout()
         layout.addWidget(button1)
         layout.addWidget(button2)
@@ -187,27 +205,23 @@ class Window(QMainWindow):
     # a function that changes setting file and backend based on user's choice
     def updateSimulationTechnique(self):
         if ("H" in self.sim_box.currentText() and "u" not in self.sim_box.currentText()):
-            changeSimulationTechniqueHamiltonian()
+            GUIHelper.changeSimulationTechniqueHamiltonian(self.GridM)
         elif ("H" in self.sim_box.currentText()):
-            changeSimulationTechniqueHamiltonianCuQuantum()
+            GUIHelper.changeSimulationTechniqueHamiltonianCuQuantum(self.GridM, self.cuQuantumTab)
         elif ("F" in self.sim_box.currentText()):
-            changeSimulationTechniqueFeynman()
-        elif ("D" in self.sim_box.currentText()):
-            if self.external_sim_msg.msg_toggle:
-                self.external_sim_msg.exec()
-            changeSimulationTechniqueDWave()
-        elif ("Q" in self.sim_box.currentText()):
-            if self.external_sim_msg.msg_toggle:
-                self.external_sim_msg.exec()
-            changeSimulationTechniqueQiskit()
-        elif ("X" in self.sim_box.currentText()):
-            if self.external_sim_msg.msg_toggle:
-                self.external_sim_msg.exec()
-            changeSimulationTechniqueXanadu()
+            GUIHelper.changeSimulationTechniqueFeynman(self.GridM)
         else:
             if self.external_sim_msg.msg_toggle:
                 self.external_sim_msg.exec()
-            changeSimulationTechniqueIBM()
+
+            if ("D" in self.sim_box.currentText()):
+                GUIHelper.changeSimulationTechniqueDWave(self.GridM)
+            elif ("Q" in self.sim_box.currentText()):
+                GUIHelper.changeSimulationTechniqueQiskit(self.GridM)
+            elif ("X" in self.sim_box.currentText()):
+                GUIHelper.changeSimulationTechniqueXanadu(self.GridM)
+            else:
+                GUIHelper.changeSimulationTechniqueIBM(self.GridM)
 
     # a function that allows user to set external backend warning msg off
     def externalMsgToggle(self, pushed):
@@ -316,41 +330,36 @@ class Window(QMainWindow):
 
     # integration function that connects checkboxs on gui to backend
     def TypeOnClicked(self):
-        global grid
-        global photonicMode
-        global offSetHorizontal
-
         Button = self.sender()
-        designer.settings.measurement = Button.isChecked()
+        self.GridM.designer.settings.measurement = Button.isChecked()
         if (Button.callsign == "measurement"):
-            changeMeasurement(Button.isChecked())
+            GUIHelper.changeMeasurement(self.GridM, Button.isChecked())
         elif (Button.callsign == "suggestion"):
-            changeSuggestion(Button.isChecked())
+            GUIHelper.changeSuggestion(self.GridM, Button.isChecked())
         elif (Button.callsign == "incresav"):
-            changeIncresav(Button.isChecked())
+            GUIHelper.changeIncresav(self.GridM, Button.isChecked())
         elif (Button.callsign == "incresim"):
-            changeIncresim(Button.isChecked())
+            GUIHelper.changeIncresim(self.GridM, Button.isChecked())
         elif (Button.callsign == "photonic"):
             # Photonic Switch requires a forced update (different width and gate sets)
             print("Update to Photonic Mode...")
-            photonicMode = not photonicMode
-            offSetHorizontal = 5
-            grid = [["-" for i in range(currentWidth + offSetHorizontal)]
-                    for j in range(currentHeight)]
-            global needToUpdate
-            needToUpdate = False
-            forceUpdate()
+            self.SS.photonicMode = not self.SS.photonicMode
+            self.GraphM.offSetHorizontal = 5
+            self.GridM.grid = [["-" for i in range(self.GraphM.currentWidth + self.GraphM.offSetHorizontal)]
+                    for j in range(self.GraphM.currentHeight)]
+            self.SS.needToUpdate = False
+            GUIHelper.forceUpdate()
 
     # Updates parameters locally and calls for forced change
     def UpdateParameters(self):
         spin = self.sender()
         val = spin.value()
         if (spin.callsign == "numqubit"):
-            updateNumQubit(val)
-            forceUpdate()
+            GUIHelper.updateNumQubit(self.GraphM, self.GridM, val)
+            GUIHelper.forceUpdate()
         elif (spin.callsign == "numwidth"):
-            updateNumWidth(val)
-            forceUpdate()
+            GUIHelper.updateNumWidth(self.GraphM, self.GridM, val)
+            GUIHelper.forceUpdate()
 
     def makeCustomGate(self):
         x1 = QInputDialog.getInt(self, 'X1', 'Input:')
@@ -366,34 +375,34 @@ class Window(QMainWindow):
                     if (y2[1]):
                         print(y2[0])
         
-        print(grid[y1[0]][x1[0] + offSetHorizontal])
-        print(grid[y2[0]][x2[0] + offSetHorizontal])
+        print(self.GridM.grid[y1[0]][x1[0] + self.GraphM.offSetHorizontal])
+        print(self.GridM.grid[y2[0]][x2[0] + self.GraphM.offsetHorizontal])
 
         customGrid = [["-" for i in range(x2[0]-x1[0]+1)]
                       for j in range(y2[0]-y1[0]+1)]
 
         for i in range(y1[0], y2[0] + 1):
             for j in range(x1[0], x2[0] + 1):
-                customGrid[i-y1[0]][j-x1[0]] = grid[i][j+offSetHorizontal]
+                customGrid[i-y1[0]][j-x1[0]] = self.GridM.grid[i][j+self.GraphM.offsetHorizontal]
 
         customGateName = QInputDialog.getText(self, 'Custom Gate Name', 'Input:')
         print(customGateName)
         if (customGateName[1] == False):
             return
         
-        customGates[customGateName[0]] = customGrid
+        self.GateM.customGates[customGateName[0]] = customGrid
 
-        forceUpdate()
+        GUIHelper.forceUpdate()
         self.grid.updateGUILayout()
         print("--------------------------------------")
-        for i in range(len(grid)):
+        for i in range(len(self.GridM.grid)):
             strtemp = ""
-            for j in range(len(grid[0])):
-                strtemp += grid[i][j]
+            for j in range(len(self.GridM.grid[0])):
+                strtemp += self.GridM.grid[i][j]
             print(strtemp)
         print("--------------------------------------")
 
-        print(customGates)
+        print(self.GateM.customGates)
 
     # let Dwave input tab show when user clicks on toolbar
     def showDWaveTab(self):

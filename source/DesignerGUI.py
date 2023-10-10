@@ -7,9 +7,6 @@ from PIL import Image
 from threading import *
 from redmail import EmailSender
 
-# Default X ignore
-ignoreX = 4
-
 # Load up all graphic images, Singleton design pattern
 gateToImage = {" ": Image.open("../assets/EMPTY.png"), "-": Image.open("../assets/GATE.png"), "H": Image.open("../assets/H.png"),
                "T": Image.open("../assets/T.png"), "S": Image.open("../assets/S.png"), "X": Image.open("../assets/X.png"), "Y": Image.open("../assets/Y.png"),
@@ -62,10 +59,10 @@ gmail = EmailSender(
 )
 
 
-
 # Create the application, window, and close application if asked
-app = QApplication(sys.argv)
-cuQuantumTab = PartialSimulationTab()
-window = Window()
-window.show()
-sys.exit(app.exec_())
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    cuQuantumTab = PartialSimulationTab()
+    window = Window()
+    window.show()
+    sys.exit(app.exec_())
