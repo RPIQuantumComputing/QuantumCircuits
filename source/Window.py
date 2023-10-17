@@ -187,7 +187,7 @@ class Window(QMainWindow):
         button1.clicked.connect(lambda: GUIHelper.runSimulation(self.GraphM, self.GridM, self.SS))
         button2 = QPushButton()
         button2.setText("Data Diagram")
-        button2.clicked.connect(lambda: GUIHelper.dataDiagramVisualization(self.GridM))
+        button2.clicked.connect(lambda: GUIHelper.dataDiagramVisualization(self.GridM, self.GraphM))
         button3 = QPushButton()
         button3.setText("LL(1) Grid Parser")
         button3.clicked.connect(GUIHelper.showParseGrid)

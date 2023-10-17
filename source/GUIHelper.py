@@ -199,7 +199,7 @@ class GUIHelper:
         print("Set width to " + str(val))
 
 
-    def dataDiagramVisualization(GridM: GridManager):
+    def dataDiagramVisualization(GridM: GridManager, GraphM: GraphicsManager):
         histogram = GridM.designer.getStatistics()
         if (type(histogram) == type(list())):
             histogramNew = dict()
@@ -208,12 +208,14 @@ class GUIHelper:
             histogram = histogramNew
 
         print("Button press for Data Diagram...")
-        print(histogram)
+
+        if (not histogram):
+            print("No data stored, please run the simulation before making the data model.")
 
         sumHistogram = sum(histogram.values())
 
         # Looks like a possible bug.
-        v = np.zeros((1, 2**len( histogram.values()[-1]) ))
+        v = np.zeros((1,  GraphM.currentHeight) )
 
         for entry, value in histogram.items():
             v[0][int(entry, 2)] = value / sumHistogram
@@ -230,11 +232,14 @@ class GUIHelper:
         plt.show()
 
     def followSelf(root, prior):
-        left = (root.get_left() and str(root) == str(root.get_left()))
-        right = (root.get_right() and str(root) == str(root.get_right()))
-
         finalValue = prior
-        while (left or right):
+        while (True):
+            left = root.get_left() and str(root) == str(root.get_left())
+            right = root.get_right() and str(root) == str(root.get_right())
+
+            if (not (left or right)):
+                break
+
             if left:
                 finalValue = max(root.get_left().get_amplitude(), finalValue)
                 root = root.get_left()
@@ -244,11 +249,10 @@ class GUIHelper:
         return finalValue
 
     def createGraph(root, parent, G, index=0, level=0):
+        s = str(root)
         left = root and root.get_left() and s == str(root.get_left())
         right = root and root.get_right() and s == str(root.get_right())
-        s = str(root)
-
-        if (not G.has_node()):
+        if (not G.has_node(s)):
             G.add_node(s, pos=(index, -level))
 
         if (s != "DD"):

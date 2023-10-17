@@ -25,7 +25,7 @@ class Designer:
     tempGrid = []
     settings = SettingsFile.Settings()
     result = None
-    resultingHistgram = None
+    resultingHistogram = None
 
     # Cursed as it is, this uses the Singleton design pattern to ensure duplicate gate objects are not create,
     # instead one stores the positions and identifying string
@@ -131,18 +131,22 @@ class Designer:
             print(tempStr)
         print(entry)
 
+
+    def update(self):
+        simulation = SimulationFile.Simulation(self.settings)
+        simulation.sendStateInfo(self.gridWidth, self.gridHeight, self.grid)
+        self.result = simulation.get_results()
+        self.resultingHistogram = simulation.get_visualization()
+    
     # Specify simulation settings, send grid information, run simulation, and get results
     def runSimulation(self):
         self.settings.shots = 256
         print(self.settings.specialGridSettings)
-        simulation = SimulationFile.Simulation(self.settings)
-        simulation.sendStateInfo(self.gridWidth, self.gridHeight, self.grid)
-        self.result = simulation.get_results()
-        self.resultingHistgram = simulation.get_visualization()
+        self.update()
 
     # Return back found result histogram
     def getVisualization(self):
-        return self.resultingHistgram
+        return self.resultingHistogram
 
     # Return back found result
     def getStatistics(self):
@@ -206,7 +210,7 @@ class Designer:
                 cbar.set_label('Relative Phase of State (Radians)',
                            rotation=-90, labelpad=20)
                 plt.title("Probability Distribution of Given Quantum Circuit")
-                self.resultingHistgram = plt
+                self.resultingHistogram = plt
             if(hasResults and self.settings.backend == "FeynmanSimulation"):
                 fig = plt.figure(figsize = (20, 5))
                 xVal = []
