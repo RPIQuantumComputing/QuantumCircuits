@@ -36,12 +36,8 @@ import plotly
 import plotly.express as px
 import plotly.graph_objects as go
 
-plotly.io.renderers.default = "browser"
-
-from plotly.offline import init_notebook_mode, iplot
-
-
-init_notebook_mode() # initiate notebook for offline plot
+import webbrowser
+import os
 
 costs = []
 # This is basically QuriPart's competition code with adjustments, will change to my competition code later
@@ -197,49 +193,79 @@ class Ui_QuantumSimulationGUI(object):
         _translate = QtCore.QCoreApplication.translate
         QuantumSimulationGUI.setWindowTitle(_translate("QuantumSimulationGUI", "MainWindow"))
 
-    def drawSphere(self, position, radius, resolution=20):
-        #source :https://stackoverflow.com/questions/70977042/how-to-plot-spheres-in-3d-with-plotly-or-another-library
-
-        print("\tDrawing Sphere")
-        
-        x, y, z = position
-        
-        u, v = np.mgrid[0:2*np.pi:resolution*2j, 0:np.pi:resolution*1j]
+    def draw_spheres(self, sphere_params):
+        sphere_data = []  # List to hold the Surface objects for each sphere
+        max_radius = max([params['radius'] for params in sphere_params])  # Determine the max radius for setting axis limits
     
-        X = radius * np.cos(u)*np.sin(v) + x
-        Y = radius * np.sin(u)*np.sin(v) + y
-        Z = radius * np.cos(v) + z
-
-        print(f"Sphere drawn at positon {x}, {y}, {z}")
-        return (X, Y, Z)
+        for params in sphere_params:
+        	# Unpack sphere parameters
+            x, y, z, radius = params['x'], params['y'], params['z'], params['radius']
+        
+        	# Create the theta and phi angles for the parametric plot
+            phi, theta = np.mgrid[0.0:np.pi:100j, 0.0:2.0*np.pi:50j]
+        
+        	# Parametric equations for the sphere
+            x_sphere = x + radius * np.sin(phi) * np.cos(theta)
+            y_sphere = y + radius * np.sin(phi) * np.sin(theta)
+            z_sphere = z + radius * np.cos(phi)
+        
+        	# Create the Surface object for the sphere and append to sphere_data list
+            sphere = go.Surface(x=x_sphere, y=y_sphere, z=z_sphere, colorscale='Viridis', showscale=False, title=params['name'])
+            sphere_data.append(sphere)
+    
+        # Define the layout for the plot, including title and axis properties
+        layout = go.Layout(
+            title="Molecule",
+            scene=dict(
+                xaxis=dict(nticks=4, range=[-max_radius-5, max_radius+5]),
+                yaxis=dict(nticks=4, range=[-max_radius-5, max_radius+5]),
+                zaxis=dict(nticks=4, range=[-max_radius-5, max_radius+5]),
+                aspectratio=dict(x=1, y=1, z=1)
+            )
+        )
+        # Create and show the figure with the aggregated sphere_data
+        fig = go.Figure(data=sphere_data, layout=layout)
+        fig.write_html('example_figure.html', auto_open=True)
+        filename = 'file:///'+os.getcwd()+'/' + 'example_figure.html'
+        webbrowser.open_new_tab(filename)
+        try:
+           os.system("google-chrome -url ./example_figure.html --no-sandbox")
+        except:
+           pass
 
     def generate3dMolecule(self, molecule):
         data = []
-        print("\tParsing atoms", flush=True)
+
+        max_radius = 0.0
         for atom in molecule:
             #seperate into element and position
-            print("\tstage 1", flush=True)
+            symbol = atom[0]
+            si = element(symbol)
+            r = si.atomic_radius
+            if(r > max_radius):
+                max_radius = r
+
+        for atom in molecule:
+            #seperate into element and position
             symbol = atom[0]
             pos = atom[1]
 
-            print("\tstage 2", flush=True)
             #find the atomic radius of the element
             si = element(symbol)
-
-            print("\tstage 3", flush=True)
             
-            r = si.atomic_radius
+            r = si.atomic_radius / max_radius
 
             x, y, z = pos
-            print(f"\t{symbol}, position: ({x}, {y}, {z}), radius: {r}", flush=True)
 
-            #draw the sphere is 3d space
-            (x_pns_surface, y_pns_surface, z_pns_suraface) = self.drawSphere(pos, r)
-            data.append(go.Surface(x=x_pns_surface, y=y_pns_surface, z=z_pns_suraface, opacity=0.5))
+            entry = dict()
+            entry['x'] = x
+            entry['y'] = y
+            entry['z'] = z
+            entry['radius'] = r
+            entry['name'] = symbol
+            data.append(entry)
 
-        print("GENERATING 3D MODEL", flush=True)
-        fig = go.Figure(data=data)
-        fig.show()
+        self.draw_spheres(data)
         
     def on_compute_integrals_clicked(self):
         elements = []
