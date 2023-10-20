@@ -74,7 +74,6 @@ def vqe(hamiltonian, parametric_state, estimator, init_params, optimizer):
             break
     return opt_state
 
-
 class RunAlgorithm:
     def __init__(self) -> None:
         pass
@@ -266,17 +265,24 @@ class Ui_QuantumSimulationGUI(object):
             data.append(entry)
 
         self.draw_spheres(data)
-        
+
+    def parseLine(self, line):
+        #line format: <element symbol> (x, y, z)
+        divided = line.split("(")
+
+        element = divided[0][:-1] 
+        position = [int(component) for component in ((divided[1][:-1]).split(","))]
+
+        return [element, position]
+      
     def on_compute_integrals_clicked(self):
         elements = []
-        deliniators = [",", "(", ")", " "]
         try:
             user_input = self.textEdit.toPlainText()
             lines = user_input.split("\n")
+
             for line in lines:
-               splited = line.split(" ")
-               element, position = splited[0], [int(element) for element in list(splited[1]) if element not in deliniators]
-               elements.append([element, position])
+               elements.append(self.parseLine(line))
 
             #make a 3d model of the molecule
             self.generate3dMolecule(elements)
