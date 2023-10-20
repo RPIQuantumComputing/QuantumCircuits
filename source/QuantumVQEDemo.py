@@ -1,16 +1,18 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 from pyscf import gto, scf
+import sys
+from typing import Any
+import numpy as np
+
+from openfermion.transforms import jordan_wigner
+from openfermion.utils import load_operator
+
 from quri_parts.pyscf.mol import get_spin_mo_integrals_from_mole
 from quri_parts.chem.mol import ActiveSpace
 from quri_parts.openfermion.mol import get_qubit_mapped_hamiltonian
 from quri_parts.openfermion.mol import get_fermionic_hamiltonian
 from quri_parts.qulacs.estimator import create_qulacs_vector_estimator
-import sys
-from typing import Any
-import numpy as np
 from quri_parts.qulacs.estimator import create_qulacs_vector_concurrent_parametric_estimator
-from openfermion.transforms import jordan_wigner
-from openfermion.utils import load_operator
 from quri_parts.algo.ansatz import HardwareEfficientReal
 from quri_parts.algo.optimizer import Adam, OptimizerStatus
 from quri_parts.circuit import LinearMappedUnboundParametricQuantumCircuit
@@ -22,7 +24,24 @@ from quri_parts.core.sampling.shots_allocator import (
 )
 from quri_parts.core.state import ParametricCircuitQuantumState, ComputationalBasisState
 from quri_parts.openfermion.operator import operator_from_openfermion_op
+
 import matplotlib.pyplot as plt
+
+import mendeleev #this is for getting the various properties of elemntents 
+from mendeleev import element
+
+#this will be used for the 3d plotting of the molecule
+import plotly
+
+import plotly.express as px
+import plotly.graph_objects as go
+
+plotly.io.renderers.default = "browser"
+
+from plotly.offline import init_notebook_mode, iplot
+
+
+init_notebook_mode() # initiate notebook for offline plot
 
 costs = []
 # This is basically QuriPart's competition code with adjustments, will change to my competition code later
@@ -112,15 +131,16 @@ class Ui_QuantumSimulationGUI(object):
 
         self.textEdit = QtWidgets.QTextEdit()
         left_layout.addWidget(self.textEdit)
-        self.textEdit.setHtml(QtCore.QCoreApplication.translate("QuantumSimulationGUI", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
-"<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
-"p, li { white-space: pre-wrap; }\n"
-"</style></head><body style=\" font-family:\'MS Shell Dlg 2\'; font-size:8.1pt; font-weight:400; font-style:normal;\">\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">\'\'\'</p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">H (0,0,0)</p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">O (2,0,1)</p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">H (0,0,2)</p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">\'\'\'</p></body></html>"))
+        self.textEdit.setHtml(QtCore.QCoreApplication.translate(
+            "QuantumSimulationGUI", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
+            "<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
+            "p, li { white-space: pre-wrap; }\n"
+            "</style></head><body style=\" font-family:\'MS Shell Dlg 2\'; font-size:8.1pt; font-weight:400; font-style:normal;\">\n"
+            "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">\'\'\'</p>\n"
+            "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">H (0,0,0)</p>\n"
+            "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">O (2,0,1)</p>\n"
+            "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">H (0,0,2)</p>\n"
+            "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">\'\'\'</p></body></html>"))
 
         self.pushButton = QtWidgets.QPushButton("Compute Electronic Integrals")
         self.pushButton.clicked.connect(self.on_compute_integrals_clicked)
@@ -177,15 +197,63 @@ class Ui_QuantumSimulationGUI(object):
         _translate = QtCore.QCoreApplication.translate
         QuantumSimulationGUI.setWindowTitle(_translate("QuantumSimulationGUI", "MainWindow"))
 
+    def drawSphere(self, position, radius, resolution=20):
+        #source :https://stackoverflow.com/questions/70977042/how-to-plot-spheres-in-3d-with-plotly-or-another-library
+
+        print("\tDrawing Sphere")
+        
+        x, y, z = position
+        
+        u, v = np.mgrid[0:2*np.pi:resolution*2j, 0:np.pi:resolution*1j]
+    
+        X = radius * np.cos(u)*np.sin(v) + x
+        Y = radius * np.sin(u)*np.sin(v) + y
+        Z = radius * np.cos(v) + z
+
+        print(f"Sphere drawn at positon {x}, {y}, {z}")
+        return (X, Y, Z)
+
+    def generate3dMolecule(self, molecule):
+        data = []
+        print("\tParsing atoms", flush=True)
+        for atom in molecule:
+            #seperate into element and position
+            print("\tstage 1", flush=True)
+            symbol = atom[0]
+            pos = atom[1]
+
+            print("\tstage 2", flush=True)
+            #find the atomic radius of the element
+            si = element(symbol)
+
+            print("\tstage 3", flush=True)
+            
+            r = si.atomic_radius
+
+            x, y, z = pos
+            print(f"\t{symbol}, position: ({x}, {y}, {z}), radius: {r}", flush=True)
+
+            #draw the sphere is 3d space
+            (x_pns_surface, y_pns_surface, z_pns_suraface) = self.drawSphere(pos, r)
+            data.append(go.Surface(x=x_pns_surface, y=y_pns_surface, z=z_pns_suraface, opacity=0.5))
+
+        print("GENERATING 3D MODEL", flush=True)
+        fig = go.Figure(data=data)
+        fig.show()
+        
     def on_compute_integrals_clicked(self):
+        elements = []
+        deliniators = [",", "(", ")", " "]
         try:
             user_input = self.textEdit.toPlainText()
             lines = user_input.split("\n")
-            elements = []
             for line in lines:
                splited = line.split(" ")
-               element, position = splited[0], [int(element) for element in list(splited[1]) if element != "," and element != ")" and element != "(" and element != " "]
+               element, position = splited[0], [int(element) for element in list(splited[1]) if element not in deliniators]
                elements.append([element, position])
+
+            #make a 3d model of the molecule
+            self.generate3dMolecule(elements)
             # Guassian-Type Molecule, M defines a molecule object
             self.user_mol = gto.M(atom=elements, verbose=0)
             # This will run a self-consistent field (iterative electronic structure until stabalization is found)
