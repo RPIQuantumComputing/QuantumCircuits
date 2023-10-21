@@ -23,11 +23,13 @@ import scipy
 import pandas as pd
 from scipy.optimize import minimize
 from qiskit import QuantumCircuit
-from qiskit import Aer, transpile
+from qiskit import IBMQ, Aer, transpile, AerSimulator
 import qiskit
 from qiskit.tools.visualization import plot_histogram, plot_state_city
 from qiskit_aer.library.save_instructions import save_statevector
 import qiskit.quantum_info as qi
+from qiskit_aer.noise import NoiseModel
+
 
 class HamiltonionBackend:
 	provider = "Local"
@@ -41,7 +43,7 @@ class HamiltonionBackend:
 	def sendAPIToken():
 		pass
 	
-	def sendRequest(self, gridWidth, gridHeight, grid):
+	def sendRequest(self, gridWidth, gridHeight, grid, isNoise):
 		# Get results, store figure, normalize, apply phase scalar map
 # Do similar decomposition process
 		circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
@@ -57,6 +59,11 @@ class HamiltonionBackend:
 		numDepth = gridWidth
 		# Make qiskit gate
 		circuit = QuantumCircuit(numQubits)
+		IBMQ.save_account(self.API_KEY, overwrite=True)
+		provider = IBMQ.load_account()
+        #backend = AerSimulator(method='density_matrix')
+		backend = provider.get_backend('ibmq_qasm_simulator')
+		noise = NoiseModel.from_backend(backend, gate_error=isNoise, readout_error=isNoise, thermal_relaxation=isNoise, temperature=0, gate_lengths=None, gate_length_units='ns', warnings=None) 								gate_lengths=None, gate_length_units='ns', warnings=None)
 		for widthIdx in range(gridWidth):
 			circuitLayer = []
 			for heightIdx in range(gridHeight):
@@ -164,7 +171,7 @@ class FeynmanBackend:
 	def sendAPIToken(api_string):
 		pass
 	
-	def sendRequest(self, gridWidth, gridHeight, grid):
+	def sendRequest(self, gridWidth, gridHeight, grid, isNoise):
 		# Do similar decomposition process
 		circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
 		for widthIdx in range(gridWidth):
@@ -242,7 +249,7 @@ class HamiltonionCuQuantumBackend:
 	def sendAPIToken():
 		pass
 	
-	def sendRequest(self, gridWidth, gridHeight, grid):
+	def sendRequest(self, gridWidth, gridHeight, grid, isNoise):
 		from cuquantum import contract
 		from cuquantum import CircuitToEinsum
 		import cuquantum
@@ -387,7 +394,7 @@ class DWaveBackend:
 	def sendAPIToken(self, api_string):
 		self.API_Token = api_string
 	
-	def sendRequest(self, gridWidth, gridHeight, grid):
+	def sendRequest(self, gridWidth, gridHeight, grid, isNoise):
 		import math
 		import dimod
 		from dimod import Binary, Integer
@@ -441,7 +448,7 @@ class XanaduBackend:
 	def sendAPIToken(self, api_string):
 		self.API_KEY = api_string
 	
-	def sendRequest(self, gridWidth, gridHeight, grid):
+	def sendRequest(self, gridWidth, gridHeight, grid, isNoise):
 		# Similar decomposition, expanded to support photonic multi-gate
 		circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
 		for widthIdx in range(gridWidth):
@@ -553,7 +560,7 @@ class QiskitBackend:
 	def sendAPIToken(self, api_string):
 		self.API_KEY = api_string
 	
-	def sendRequest(self, gridWidth, gridHeight, grid):
+	def sendRequest(self, gridWidth, gridHeight, grid, isNoise):
 		# Same as before in Feynman
 		circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
 		for widthIdx in range(gridWidth):
@@ -567,6 +574,7 @@ class QiskitBackend:
 		numQubits = gridHeight
 		numDepth = gridWidth
 		circuit = QuantumCircuit(numQubits)
+		circuit_with_error = NoiseModel()
 		for widthIdx in range(gridWidth):
 			circuitLayer = []
 			for heightIdx in range(gridHeight):

@@ -14,6 +14,7 @@ class Simulation:
     gridWidth = 8
     gridHeight = 5
     grid = None
+    isNoise = False
 
     # Save the given settings for the simulation
     def __init__(self, newSettings):
@@ -29,7 +30,7 @@ class Simulation:
     # Runs simulation if results requested or obtains them from prior run
     def get_results(self, rerun=False):
         if(self.ranBefore == False or rerun == True):
-            self.backend.sendRequest(self.gridWidth, self.gridHeight, self.grid)
+            self.backend.sendRequest(self.gridWidth, self.gridHeight, self.grid, self.isNoise)
             self.ranBefore = True
         if(self.backend != None):
             return self.backend.results
@@ -38,7 +39,7 @@ class Simulation:
     # Runs simulation if results requested or obtains them from prior run
     def get_visualization(self, rerun=False):
         if(self.ranBefore == False or rerun == True):
-            self.backend.sendRequest(self.gridWidth, self.gridHeight, self.grid)
+            self.backend.sendRequest(self.gridWidth, self.gridHeight, self.grid, self.isNoise)
             self.ranBefore = True
         if(self.backend != None):
             return self.backend.histogramResult
