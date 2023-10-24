@@ -28,11 +28,21 @@ class MainWindow(QMainWindow):
         # Create a selection widget (left side)
         selection_widget = QWidget()
         selection_layout = QGridLayout(selection_widget)
+
         # Add buttons for operations
-        # You can customize this part based on your needs
+        operations = ["X", "Y", "Z", "CNOT", "CX", "CZ", "RX", "RY", "RZ", "P", "T", "T'", "P'", "H", "M", "Toffoli", "U(theta1, theta2, theta3)", "RZZ", "RYY", "RXX", "RXY"]
+        row = 0
+        col = 0
+        for operation in operations:
+            operation_button = CustomWidget(operation)
+            selection_layout.addWidget(operation_button, row, col)
+            col += 1
+            if col == 3:
+                col = 0
+                row += 1
 
         layout.addWidget(selection_widget, 0, 0)
-        layout.setColumnMinimumWidth(0, 100)  # Adjust the width
+        layout.setColumnMinimumWidth(0, 200)  # Adjust the width
 
         # Create a grid (right side) for drag-and-drop
         grid_widget = QWidget()
