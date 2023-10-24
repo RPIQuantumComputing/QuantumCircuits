@@ -44,11 +44,11 @@ class HamiltonionBackend:
 					else:
 						circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
 		numQubits = gridHeight
-		numDepth = gridWidth
+
 		# Make qiskit gate
 		circuit = QuantumCircuit(numQubits)
 		for widthIdx in range(gridWidth):
-			circuitLayer = []
+
 			for heightIdx in range(gridHeight):
 				if(grid[widthIdx][heightIdx].getName() != '-'):
 					if(grid[widthIdx][heightIdx].getName() == 'H'):
@@ -236,7 +236,7 @@ class HamiltonionCuQuantumBackend:
 		from cuquantum import CircuitToEinsum
 		import cuquantum
 		# Get results, store figure, normalize, apply phase scalar map
-# Do similar decomposition process
+        # Do similar decomposition process
 		circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
 		for widthIdx in range(gridWidth):
 			for heightIdx in range(gridHeight):
@@ -247,11 +247,10 @@ class HamiltonionCuQuantumBackend:
 					else:
 						circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
 		numQubits = gridHeight
-		numDepth = gridWidth
+
 		# Make qiskit gate
 		circuit = QuantumCircuit(numQubits)
 		for widthIdx in range(gridWidth):
-			circuitLayer = []
 			for heightIdx in range(gridHeight):
 				if(grid[widthIdx][heightIdx].getName() != '-'):
 					if(grid[widthIdx][heightIdx].getName() == 'H'):
@@ -323,7 +322,7 @@ class HamiltonionCuQuantumBackend:
 				results.append([bitstring, probability, np.angle(amplitude)])
 			self.result = results
 			print("Finished sampling desired subset of distribution...")
-		fig = plt.figure(figsize = (20, 5))
+		# fig = plt.figure(figsize = (20, 5))
 		xVal = []
 		yVal = []
 		norm = mpl.colors.Normalize(vmin=0, vmax=np.pi)
@@ -376,14 +375,12 @@ class DWaveBackend:
 	def sendAPIToken(self, api_string):
 		self.API_Token = api_string
 	
-	def sendRequest(self, gridWidth, gridHeight, grid):
-		import math
+	def sendRequest(self):
 		import dimod
-		from dimod import Binary, Integer
-		import dwave.inspector
+
 		# Initalize a constraint quadratic model
 		cqm = dimod.CQM()
-		stop = False
+		
 		# Execute variable declarations
 		for entry in self.settings.variableDeclarationsQUBO:
 			if(len(entry) > 1):
@@ -397,7 +394,6 @@ class DWaveBackend:
 		else:
 			eval("cqm.set_objective(" + objectiveFunction[4:] + ")")
 		# Add constraints
-		stop = False
 		for entry in self.settings.constraintsQUBO:
 			if(len(entry) > 1):
 				eval("cqm.add_constraint(" + entry + ")")
@@ -411,7 +407,6 @@ class DWaveBackend:
 		valuesFound = []
 		for energy, in sampleset.data(fields=['energy']):
 			valuesFound.append(energy)
-		fig = plt.figure(figsize = (20, 5))
 		plt.hist(valuesFound)
 		plt.xlabel("Minimum Energy of Solutions")
 		plt.ylabel("Amount of Occurences")
@@ -446,7 +441,7 @@ class XanaduBackend:
 		from strawberryfields import ops
 
 		# Assume fock measurement
-		measurementType = ["F" for i in range(numQubits)]
+		# measurementType = ["F" for i in range(numQubits)]
 		# Initalize program
 		circuit = sf.Program(numQubits)
 		with circuit.context as q:
@@ -554,10 +549,8 @@ class QiskitBackend:
 					else:
 						circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
 		numQubits = gridHeight
-		numDepth = gridWidth
 		circuit = QuantumCircuit(numQubits)
 		for widthIdx in range(gridWidth):
-			circuitLayer = []
 			for heightIdx in range(gridHeight):
 				if(grid[widthIdx][heightIdx].getName() != '-'):
 					if(grid[widthIdx][heightIdx].getName() == 'H'):
