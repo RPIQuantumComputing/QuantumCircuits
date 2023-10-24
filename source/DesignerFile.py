@@ -132,17 +132,21 @@ class Designer:
         print(entry)
 
 
-    def update(self):
+    """ 
+    TODO:
+        Fix this bug. The backend needs to constantly updated. 
+    """
+    def update(self, show):
         simulation = SimulationFile.Simulation(self.settings)
         simulation.sendStateInfo(self.gridWidth, self.gridHeight, self.grid)
-        self.result = simulation.get_results()
+        self.result = simulation.get_results(show=show)
         self.resultingHistogram = simulation.get_visualization()
     
     # Specify simulation settings, send grid information, run simulation, and get results
     def runSimulation(self):
         self.settings.shots = 256
         print(self.settings.specialGridSettings)
-        self.update()
+        self.update(show=True)
 
     # Return back found result histogram
     def getVisualization(self):
@@ -150,6 +154,7 @@ class Designer:
 
     # Return back found result
     def getStatistics(self):
+        self.update(show=True)
         return self.result
 
     # Allows one to set the backend being used

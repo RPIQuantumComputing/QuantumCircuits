@@ -1,4 +1,3 @@
-from unittest import result
 import SettingsFile
 import math
 import matplotlib.pyplot as plt
@@ -12,22 +11,13 @@ except:
 	hasCupy = False
 # Various Imports
 import numpy as tnp
-import random
 import matplotlib.cm as cm
 import matplotlib as mpl
 import itertools
-import functools
-from numpy.random import choice, rand
-from numpy import linalg as LA
-import scipy
 import pandas as pd
-from scipy.optimize import minimize
 from qiskit import QuantumCircuit
 from qiskit import Aer, transpile
-import qiskit
-from qiskit.tools.visualization import plot_histogram, plot_state_city
-from qiskit_aer.library.save_instructions import save_statevector
-import qiskit.quantum_info as qi
+from qiskit_aer.library.save_instructions.save_statevector import save_statevector
 
 class HamiltonionBackend:
 	provider = "Local"
@@ -176,11 +166,10 @@ class FeynmanBackend:
 					else:
 						circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
 		numQubits = gridHeight
-		numDepth = gridWidth
+		
 		# Make qiskit gate
 		circuit = QuantumCircuit(numQubits)
 		for widthIdx in range(gridWidth):
-			circuitLayer = []
 			for heightIdx in range(gridHeight):
 				if(grid[widthIdx][heightIdx].getName() != '-'):
 					if(grid[widthIdx][heightIdx].getName() == 'H'):
@@ -202,7 +191,7 @@ class FeynmanBackend:
 		# Save results
 		simulator = Aer.get_backend('aer_simulator_density_matrix')
 		self.results = simulator.run(circuit).result().get_counts(circuit)
-		fig = plt.figure(figsize = (20, 5))
+		# fig = plt.figure(figsize = (20, 5))
 		xVal = []
 		yVal = []
 		total = 0

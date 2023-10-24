@@ -211,6 +211,7 @@ class GUIHelper:
 
         if (not histogram):
             print("No data stored, please run the simulation before making the data model.")
+            return
 
         sumHistogram = sum(histogram.values())
 
