@@ -23,12 +23,13 @@ import scipy
 import pandas as pd
 from scipy.optimize import minimize
 from qiskit import QuantumCircuit
-from qiskit import IBMQ, Aer, transpile, AerSimulator
+from qiskit import IBMQ, Aer, transpile, AerSimulator, execute
 import qiskit
 from qiskit.tools.visualization import plot_histogram, plot_state_city
 from qiskit_aer.library.save_instructions import save_statevector
 import qiskit.quantum_info as qi
 from qiskit_aer.noise import NoiseModel
+from qiskit.test.mock import FakeVigo
 
 
 class HamiltonionBackend:
@@ -59,11 +60,9 @@ class HamiltonionBackend:
 		numDepth = gridWidth
 		# Make qiskit gate
 		circuit = QuantumCircuit(numQubits)
-		IBMQ.save_account(self.API_KEY, overwrite=True)
-		provider = IBMQ.load_account()
-        #backend = AerSimulator(method='density_matrix')
-		backend = provider.get_backend('ibmq_qasm_simulator')
-		noise = NoiseModel.from_backend(backend, gate_error=isNoise, readout_error=isNoise, thermal_relaxation=isNoise, temperature=0, gate_lengths=None, gate_length_units='ns', warnings=None) 								gate_lengths=None, gate_length_units='ns', warnings=None)
+		device_backend = FakeVigo()
+        #coupling_map = device_backend.configuration().coupling_map
+		noise_model = NoiseModel.from_backend(device_backend, gate_error=isNoise, readout_error=isNoise, thermal_relaxation=isNoise)
 		for widthIdx in range(gridWidth):
 			circuitLayer = []
 			for heightIdx in range(gridHeight):
@@ -84,6 +83,14 @@ class HamiltonionBackend:
 						circuit.cnot(heightIdx, heightIdx + 1)
 						heightIdx += 1
 		circuit.save_statevector()
+
+		circuit.measure_all()
+		simulator = Aer.get_backend('aer_simulator')
+		#basis_gates = noise_model.basis_gates
+		result_noise = execute(circuit, simulator, noise_model=noise_model).result()
+		counts_noise = result_noise.get_counts(circuit)
+		plot_histogram(counts_noise, title="Probability graph with noise")
+
 		# Compute the probability of certain qubits being 1, i.e. specific bitstring result
 		def returnProbabilitiy(statevector, qubitsActive):
 			projectTo = np.array([1])
