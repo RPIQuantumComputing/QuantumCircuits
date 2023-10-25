@@ -18,8 +18,9 @@ import pandas as pd
 from qiskit import QuantumCircuit
 from qiskit import Aer, transpile
 from qiskit_aer.library.save_instructions.save_statevector import save_statevector
+from BackendInterface import Backend
 
-class HamiltonionBackend:
+class HamiltonionBackend():
 	provider = "Local"
 	settings = None
 	histogramResult = None

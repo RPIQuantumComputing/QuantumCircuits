@@ -227,6 +227,7 @@ class GUIHelper:
         GUIHelper.createGraph(root, root, G)
         pos = nx.get_node_attributes(G, 'pos')
         nx.draw(G, pos, with_labels=True)
+        
         # Currently, the implementation is buggy...to say the least, works with amplitudes, just don't show the user :P
         # labels = nx.get_edge_attributes(G,'weight')
         # nx.draw_networkx_edge_labels(G,pos,edge_labels=labels)
