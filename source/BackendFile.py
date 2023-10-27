@@ -20,7 +20,7 @@ from qiskit import Aer, transpile
 from qiskit_aer.library.save_instructions.save_statevector import save_statevector
 from BackendInterface import Backend
 
-class HamiltonionBackend():
+class HamiltonionBackend(Backend):
 	provider = "Local"
 	settings = None
 	histogramResult = None
@@ -143,7 +143,7 @@ class HamiltonionBackend():
 		self.histogramResult = plt
 		self.results = results
 
-class FeynmanBackend:
+class FeynmanBackend(Backend):
 	provider = "Local"
 	settings = None
 	histogramResult = None
@@ -210,6 +210,7 @@ class FeynmanBackend:
 			)
 		)
 		# Same plotting as before
+	def plotRequest(self, df, xVal):
 		df_sorted = df.sort_values('x')
 		plt.bar(df_sorted['x'], df_sorted['y'], width = 0.4)
 		plt.xlabel("Computational Result")
@@ -220,7 +221,7 @@ class FeynmanBackend:
 		self.histogramResult = plt
 		print(self.results)
 		
-class HamiltonionCuQuantumBackend:
+class HamiltonionCuQuantumBackend(Backend):
 	provider = "Local"
 	settings = None
 	histogramResult = None
@@ -312,7 +313,7 @@ class HamiltonionCuQuantumBackend:
 			sv = sv.reshape(-1)
 			print("Statevector found by Tensor Network Contraction")
 			results = getAllPossibilities(sv, numQubits)
-			self.result = results
+			self.results = results
 		else:
 			print("Performing Selective Tensor Network Contraction")
 			results = []
@@ -321,7 +322,7 @@ class HamiltonionCuQuantumBackend:
 				amplitude = contract(expression, *operands)
 				probability = abs(amplitude) ** 2
 				results.append([bitstring, probability, np.angle(amplitude)])
-			self.result = results
+			self.results = results
 			print("Finished sampling desired subset of distribution...")
 		# fig = plt.figure(figsize = (20, 5))
 		xVal = []
@@ -348,7 +349,9 @@ class HamiltonionCuQuantumBackend:
 				phase=phases
 			)
 		)
+		self.results = results
 
+	def plotRequest(self, df, xVal, m):
 		df_sorted = df.sort_values('x')
 		# Make graph
 		plt.bar(df_sorted['x'], df_sorted['y'], width = 0.4, color = df_sorted['phase'])
@@ -361,9 +364,9 @@ class HamiltonionCuQuantumBackend:
 		cbar.set_label('Relative Phase of State (Radians)', rotation=-90, labelpad=20)
 		plt.title("Probability Distribution of Given Quantum Circuit")
 		self.histogramResult = plt
-		self.results = results
 
-class DWaveBackend:
+
+class DWaveBackend(Backend):
 	provider = "DWave"
 	settings = None
 	histogramResult = None
@@ -405,6 +408,7 @@ class DWaveBackend:
 		sampleset = sampleset.filter(lambda row: row.is_feasible)
 		self.results = sampleset
 		# Get resulting energies and save result
+	def plotRequest(self, sampleset):
 		valuesFound = []
 		for energy, in sampleset.data(fields=['energy']):
 			valuesFound.append(energy)
@@ -413,7 +417,7 @@ class DWaveBackend:
 		plt.ylabel("Amount of Occurences")
 		self.histogramResult = plt
 
-class XanaduBackend:
+class XanaduBackend(Backend):
 	provider = "Xandadu"
 	settings = None
 	histogramResult = None
@@ -516,7 +520,8 @@ class XanaduBackend:
 				result[s[:len(s)-1]] += 1
 		print("Saved values...")
 		# Save relevant infromation
-		fig = plt.figure(figsize = (20, 5))
+		#fig = plt.figure(figsize = (20, 5))
+	def plotRequest(self, result):
 		plt.bar(result.keys(), result.values(), 1, color='b')
 		plt.xlabel("Fock Measurement State (binary representation for 'qubit' analysis)")
 		plt.ylabel("Occurences")
@@ -524,7 +529,7 @@ class XanaduBackend:
 		self.histogramResult = plt
 		self.results = result
 
-class QiskitBackend:
+class QiskitBackend(Backend):
 	provider = "Qiskit"
 	settings = None
 	histogramResult = None
@@ -598,7 +603,7 @@ class QiskitBackend:
 				y=yVal
 			)
 		)
-
+	def plotRequest(self, df):
 		df_sorted = df.sort_values('x')
 		plt.bar(df_sorted['x'], df_sorted['y'], width = 0.4)
 		plt.xlabel("Computational Result")
@@ -607,7 +612,8 @@ class QiskitBackend:
 		plt.xticks(rotation = rotationAmount)
 		plt.title("Probability Distribution of Given Quantum Circuit")
 		self.histogramResult = plt
-		print(self.results)
+		plt.show()
+		#print(self.results)
 
 # Backend factor to create gates
 def BackendFactory(backendType="HamiltionSimulation", settings=SettingsFile.Settings()):
