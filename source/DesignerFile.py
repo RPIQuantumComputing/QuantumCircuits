@@ -29,6 +29,15 @@ from qiskit.tools.visualization import plot_histogram, plot_state_city
 from qiskit_aer.library.save_instructions import save_statevector
 import qiskit.quantum_info as qi
 import ParseCircuit
+import sys
+import tkinter as tk
+from tkinter import simpledialog
+
+def get_api_key():
+    root = tk.Tk()
+    root.withdraw()  # Hide the main window
+    api_key = simpledialog.askstring("API Key Request", "Please enter your API key:")
+    return api_key
 
 def getGrid(grid, gridWidth, gridHeight):
     circuitOperators = [['-' for j in range(gridHeight)] for i in range(gridWidth)]
@@ -355,7 +364,7 @@ class DWaveBackend:
     settings = None
     histogramResult = None
     results = None
-    API_Token = "DEV-2a83ec13135e2944cebbeddf32592573221b3937"
+    API_Token = "NONE"
 
     def __init__(self, newSettings):
         self.settings = newSettings
@@ -389,6 +398,8 @@ class DWaveBackend:
             if(len(entry) > 1):
                 eval("cqm.add_constraint(" + entry + ")")
         # Use token to sample solutions and filter out infeasible ones
+        if(self.API_Token == "NONE"):
+            self.API_Token = get_api_key()
         from dwave.system import LeapHybridCQMSampler
         sampler = LeapHybridCQMSampler(token=self.API_Token)     
         sampleset = sampler.sample_cqm(cqm, label='QuboParsing')
@@ -409,7 +420,7 @@ class XanaduBackend:
     settings = None
     histogramResult = None
     results = None
-    API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICIwYTdjOGE5Yi1lMzdkLTQ0MzItOTU2OC0xNzI3YzEwNmYyMzEifQ.eyJpYXQiOjE2NTg2MTU5MzUsImp0aSI6IjE5NDNmYTU5LWYxZmMtNDczZS04ZDliLThjZGE2MGVmOGE5MyIsImlzcyI6Imh0dHBzOi8vcGxhdGZvcm0ueGFuYWR1LmFpL2F1dGgvcmVhbG1zL3BsYXRmb3JtIiwiYXVkIjoiaHR0cHM6Ly9wbGF0Zm9ybS54YW5hZHUuYWkvYXV0aC9yZWFsbXMvcGxhdGZvcm0iLCJzdWIiOiJmMmIwYmJkYi05NzJkLTRiZDgtYjZhOS0xNTU3MWY4NDVlNjMiLCJ0eXAiOiJPZmZsaW5lIiwiYXpwIjoicHVibGljIiwic2Vzc2lvbl9zdGF0ZSI6ImIyNTI4ZmZlLTUwNzUtNDMwYy05YWZkLTdiZDA0MmI1ZTEwYyIsInNjb3BlIjoicHVibGljLXJvbGVzIHByb2ZpbGUgZW1haWwgb2ZmbGluZV9hY2Nlc3MiLCJzaWQiOiJiMjUyOGZmZS01MDc1LTQzMGMtOWFmZC03YmQwNDJiNWUxMGMifQ.c0wXKPXBCqfB9hOoFCe7-Fp-oSJ8wY2Sa_Sgvmn4-Oc"
+    API_KEY = "NONE"
 
     def __init__(self, newSettings):
         self.settings = newSettings
@@ -483,6 +494,9 @@ class XanaduBackend:
                             heightIdx += 1
             ops.MeasureFock() | q # Assume fock measurement technique
 
+        if(self.API_Token == "NONE"):
+            self.API_Token = get_api_key()
+        
         # Save API token, ping for request
         import xcc
         from strawberryfields import RemoteEngine
@@ -520,7 +534,7 @@ class QiskitBackend:
     settings = None
     histogramResult = None
     results = None
-    API_KEY = "55b82f2dcb56e1a96a368905f14504a9c229c9cc212ab7b7f46039e087d54e201c3205f07ba1efed86d880fb82635a630803b072669020cd6eb43589f1abaa0d"
+    API_KEY = "NONE"
 
 
     def __init__(self, newSettings):
@@ -540,6 +554,8 @@ class QiskitBackend:
         circuit = QuantumCircuit(numQubits)
         circuit = makeCircuit(circuit, instructions)     
         circuit.measure_all()
+        if(self.API_Token == "NONE"):
+            self.API_Token = get_api_key()
         
         # This time, use the QaSM provider
         from qiskit import IBMQ
