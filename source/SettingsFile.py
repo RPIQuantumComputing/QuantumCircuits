@@ -6,7 +6,9 @@ class Settings:
     num_width = 8
     shots = -1
     measurement = False
-    noise_model = None
+    gate_error = False
+    readout_error = False
+    temperature = 0
     optimization = None
     gate_suggestion = False
     incremental_saving = False

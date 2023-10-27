@@ -255,6 +255,12 @@ def changeSimulationTechniqueXanadu():
     print("Changed to Xanadu Photonic Backend")
 
 # Change Various settings based on click events, self-explanatory
+def changeGateError(checked):
+    designer.settings.gate_error = checked
+    print("Set gate error to " + str(checked))
+def changeReadoutError(checked):
+    designer.settings.readout_error = checked
+    print("Set readout error to " + str(checked))
 def changeMeasurement(checked):
     designer.settings.measurement = checked
     print("Set measurement to " + str(checked))
@@ -268,6 +274,9 @@ def changeIncresav(checked):
 def changeIncresim(checked):
     designer.settings.incremental_simulation = checked
     print("Set incremental simulation to " + str(checked))
+def updateTemperature(val):
+    designer.settings.temperature = val
+    print("Set temperature to " + str(val))
 def updateNumQubit(val):
     designer.settings.num_qubits = val
     global currentHeight
@@ -1006,6 +1015,17 @@ class Window(QMainWindow):
         self.SimulationSetting = QGroupBox("Simulation Setting")
 
         layout = QVBoxLayout()
+
+        gate_error = QCheckBox("Gate Error")
+        gate_error.toggled.connect(self.TypeOnClicked)
+        gate_error.callsign = "gate_error"
+        layout.addWidget(gate_error)
+
+        readout_error = QCheckBox("Readout Error")
+        readout_error.toggled.connect(self.TypeOnClicked)
+        readout_error.callsign = "readout_error"
+        layout.addWidget(readout_error)
+        
         #check box for measurement, setting will be updated once toggled
         measurement = QCheckBox("Measurement")
         measurement.toggled.connect(self.TypeOnClicked)
@@ -1048,7 +1068,16 @@ class Window(QMainWindow):
         optimization_selection = ["none", "other..."]
         optimization_box = QComboBox()
         optimization_box.addItems(optimization_selection)
-
+        
+        
+        temperature = QSpinBox(self.SimulationSetting)
+        temperature.setValue(0)
+        temperature.callsign = "temperature"
+        temperature.setMinimum(0)
+        temperature.setMaximum(2147483647)
+        temperature_label = QLabel("Temperature (mK): ")
+        temperature.valueChanged.connect(self.UpdateParameters)
+        
         num_qubits = QSpinBox(self.SimulationSetting)
         num_qubits.setValue(5)
         num_qubits.callsign = "numqubit"
@@ -1088,6 +1117,8 @@ class Window(QMainWindow):
         width_label.setBuddy(num_width)
         layout.addWidget(optimization_label)
         layout.addWidget(optimization_box)
+        layout.addWidget(temperature_label)
+        layout.addWidget(temperature)
         layout.addWidget(qubit_label)
         layout.addWidget(num_qubits)
         layout.addWidget(width_label)
@@ -1100,7 +1131,11 @@ class Window(QMainWindow):
     def TypeOnClicked(self):
         Button = self.sender()
         designer.settings.measurement = Button.isChecked()
-        if (Button.callsign == "measurement"):
+        if (Button.callsign == "gate_error"):
+            changeGateError(Button.isChecked())
+        if (Button.callsign == "readout_error"):
+            changeReadoutError(Button.isChecked())
+        elif (Button.callsign == "measurement"):
             changeMeasurement(Button.isChecked())
         elif (Button.callsign == "suggestion"):
             changeSuggestion(Button.isChecked())
@@ -1133,6 +1168,9 @@ class Window(QMainWindow):
         elif (spin.callsign == "numwidth"):
             updateNumWidth(val)
             forceUpdate()
+        elif (spin.callsign == "temperature"):
+            updateTemperature(val)
+            #forceUpdate()
 
     def makeCustomGate(self):
         x1 = QtWidgets.QInputDialog.getInt(self, 'X1', 'Input:')
