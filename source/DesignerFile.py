@@ -154,7 +154,7 @@ class Designer:
 
     # Return back found result
     def getStatistics(self):
-        self.update(show=True)
+        self.update(show=False)
         return self.result
 
     # Allows one to set the backend being used
