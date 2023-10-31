@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QGridLayout, QPushButton, QLineEdit
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QGridLayout, QPushButton, QLineEdit, QLabel
 
 class CustomWidget(QPushButton):
     def __init__(self, text, parent=None):
@@ -31,10 +31,8 @@ class GridWidget(QWidget):
             self.grid.append(row)
 
 class MainWindow(QMainWindow):
-    def __init__(self, grid_width, grid_height):
+    def __init__(self):
         super().__init__()
-        self.grid_width = grid_width
-        self.grid_height = grid_height
         self.initUI()
 
     def initUI(self):
@@ -62,9 +60,19 @@ class MainWindow(QMainWindow):
         layout.addWidget(selection_widget, 0, 0)
         layout.setColumnMinimumWidth(0, 200)  # Adjust the width
 
-        # Create a grid (right side) for drag-and-drop
-        grid_widget = GridWidget(self.grid_width, self.grid_height)
+        # Create input fields for grid width and height
+        width_label = QLabel("Grid Width:")
+        height_label = QLabel("Grid Height:")
+        self.width_input = QLineEdit()
+        self.height_input = QLineEdit()
 
+        layout.addWidget(width_label, 1, 0)
+        layout.addWidget(self.width_input, 1, 1)
+        layout.addWidget(height_label, 2, 0)
+        layout.addWidget(self.height_input, 2, 1)
+
+        # Create a grid (right side) for drag-and-drop
+        grid_widget = GridWidget(1, 1)  # Default grid size
         layout.addWidget(grid_widget, 0, 1)
         layout.setColumnStretch(1, 1)  # Allow resizing of the right grid
 
@@ -74,7 +82,7 @@ class MainWindow(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
-    window = MainWindow(4, 4)  # Set the grid width and height as desired
+    window = MainWindow()
     sys.exit(app.exec_())
 
 if __name__ == '__main__':
