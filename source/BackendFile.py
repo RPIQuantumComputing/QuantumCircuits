@@ -1,4 +1,3 @@
-from turtle import width
 from unittest import result
 import SettingsFile
 import math
@@ -24,20 +23,80 @@ import scipy
 import pandas as pd
 from scipy.optimize import minimize
 from qiskit import QuantumCircuit
-from qiskit import IBMQ, Aer, transpile, execute
+from qiskit import Aer, transpile
 import qiskit
 from qiskit.tools.visualization import plot_histogram, plot_state_city
 from qiskit_aer.library.save_instructions import save_statevector
 import qiskit.quantum_info as qi
-from qiskit_aer.noise import NoiseModel
-from qiskit.test.mock import FakeVigo
+import ParseCircuit
+import sys
+import tkinter as tk
+from tkinter import simpledialog
+from qiskit.circuit.random import random_circuit 
+from qiskit.quantum_info import SparsePauliOp 
+from qiskit_ibm_runtime import QiskitRuntimeService, Estimator 
+from qiskit_ibm_runtime import Sampler
 
+def get_api_key():
+    root = tk.Tk()
+    root.withdraw()  # Hide the main window
+    api_key = simpledialog.askstring("API Key Request", "Please enter your API key:")
+    return api_key
+
+def getGrid(grid, gridWidth, gridHeight):
+    circuitOperators = [['-' for j in range(gridHeight)] for i in range(gridWidth)]
+    for widthIdx in range(gridWidth):
+        for heightIdx in range(gridHeight):
+            name = grid[widthIdx][heightIdx].getName()
+            if('CNOT' in name or 'CX' in name):
+                print("Setting")
+                circuitOperators[widthIdx][heightIdx+1] = "*"
+            if(name != '-'):
+                circuitOperators[widthIdx][heightIdx] = name
+    return circuitOperators
+
+def getInstructions(object_grid, gridWidth, gridHeight):
+    grid = getGrid(object_grid, gridWidth, gridHeight)
+    node = ParseCircuit.parse(grid)
+    return ParseCircuit.get_instructions(node)
+
+def makeCircuit(qc, gate_sequence):
+    # Iterate through the gate sequence and add gates to the circuit
+    for gate, qubit_dict in gate_sequence:
+        # The qubits on which the gate acts
+        qubits = list(qubit_dict.keys())
+        if gate == 'H':
+            # Hadamard gate
+            qc.h(qubits[0])
+        elif gate.startswith('X'):
+            # Pauli-X gate (with optional rotation angle)
+            angle = gate.split('(')[1].split(')')[0] if '(' in gate else None
+            angle = float(angle) if angle else None
+            qc.rx(angle, qubits[0]) if angle else qc.x(qubits[0])
+        elif gate.startswith('Y'):
+            # Pauli-Y gate (with optional rotation angle)
+            angle = gate.split('(')[1].split(')')[0] if '(' in gate else None
+            angle = float(angle) if angle else None
+            qc.ry(angle, qubits[0]) if angle else qc.y(qubits[0])
+        elif gate.startswith('Z'):
+            # Pauli-Y gate (with optional rotation angle)
+            angle = gate.split('(')[1].split(')')[0] if '(' in gate else None
+            angle = float(angle) if angle else None
+            qc.rz(angle, qubits[0]) if angle else qc.z(qubits[0])
+        elif gate == 'T':
+            # T gate
+            qc.t(qubits[0])
+        elif gate == 'CX':
+            # Controlled-X (CNOT) gate
+            qc.cx(qubits[1], qubits[0])  # Control qubit, Target qubit
+    return qc
+    
 class HamiltonionBackend:
     provider = "Local"
     settings = None
     histogramResult = None
     results = None
-    
+
     def __init__(self, newSettings):
         self.settings = newSettings
     
@@ -47,56 +106,14 @@ class HamiltonionBackend:
     def sendRequest(self, gridWidth, gridHeight, grid):
         # Get results, store figure, normalize, apply phase scalar map
 # Do similar decomposition process
-        circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
-        for widthIdx in range(gridWidth):
-            for heightIdx in range(gridHeight):
-                if(grid[widthIdx][heightIdx].getName() != '-'):
-                    if(grid[widthIdx][heightIdx].getName() == 'CNOT'):
-                        circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
-                        circuitOperators[widthIdx][heightIdx+1] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
-                    else:
-                        circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
+        instructions = getInstructions(grid, gridWidth, gridHeight)
         numQubits = gridHeight
         numDepth = gridWidth
-        # Make qiskit gate
-        circuit = QuantumCircuit(numQubits)
-        device_backend = FakeVigo()
-        #coupling_map = device_backend.configuration().coupling_map
-        isNoise = self.settings.gate_error or self.settings.readout_error or (self.settings.temperature != 0)
-        noise_model = NoiseModel.from_backend(device_backend,
-                                              gate_error=self.settings.gate_error,
-                                              readout_error=self.settings.readout_error,
-                                              thermal_relaxation=self.settings.temperature != 0,
-                                              temperature=self.settings.temperature)
-        print(noise_model)
-        for widthIdx in range(gridWidth):
-            circuitLayer = []
-            for heightIdx in range(gridHeight):
-                if(grid[widthIdx][heightIdx].getName() != '-'):
-                    if(grid[widthIdx][heightIdx].getName() == 'H'):
-                        circuit.h(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'X'):
-                        circuit.x(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'Y'):
-                        circuit.y(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'Z'):
-                        circuit.z(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'S'):
-                        circuit.s(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'T'):
-                        circuit.t(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'CNOT'):
-                        circuit.cnot(heightIdx, heightIdx + 1)
-                        heightIdx += 1
-        circuit.save_statevector()
 
-        #coupling_map=coupling_map,
-        circuit.measure_all()
-        simulator = Aer.get_backend('aer_simulator')
-        #basis_gates = noise_model.basis_gates
-        result_noise = execute(circuit, simulator, noise_model=noise_model).result()
-        counts_noise = result_noise.get_counts(circuit)
-        plot_histogram(counts_noise, title="Probability graph with noise")
+        # Make qiskit circuit
+        circuit = QuantumCircuit(numQubits)
+        circuit = makeCircuit(circuit, instructions)     
+        circuit.save_statevector()
 
         # Compute the probability of certain qubits being 1, i.e. specific bitstring result
         def returnProbabilitiy(statevector, qubitsActive):
@@ -124,7 +141,7 @@ class HamiltonionBackend:
             return result
         
         # Save results
-        #simulator = Aer.get_backend('aer_simulator') UNCOMMENT THIS
+        simulator = Aer.get_backend('aer_simulator')
         circ = transpile(circuit, simulator)
 
         # Run and get statevector
@@ -150,6 +167,7 @@ class HamiltonionBackend:
             phases = [m.to_rgba(tnp.angle(results[j][2].get() * 1j)) for j in range(len(results))]
         else:
             phases = [m.to_rgba(tnp.angle(results[j][2] * 1j)) for j in range(len(results))]
+            
         # Values are not sorted, do your magic pandas!
         df = pd.DataFrame(
             dict(
@@ -173,8 +191,6 @@ class HamiltonionBackend:
         self.histogramResult = plt
         self.results = results
 
-        
-
 class FeynmanBackend:
     provider = "Local"
     settings = None
@@ -189,39 +205,14 @@ class FeynmanBackend:
     
     def sendRequest(self, gridWidth, gridHeight, grid):
         # Do similar decomposition process
-        circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
-        for widthIdx in range(gridWidth):
-            for heightIdx in range(gridHeight):
-                if(grid[widthIdx][heightIdx].getName() != '-'):
-                    if(grid[widthIdx][heightIdx].getName() == 'CNOT'):
-                        circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
-                        circuitOperators[widthIdx][heightIdx+1] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
-                    else:
-                        circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
+        instructions = getInstructions(grid, gridWidth, gridHeight)
         numQubits = gridHeight
         numDepth = gridWidth
-        # Make qiskit gate
+
+        # Make qiskit circuit
         circuit = QuantumCircuit(numQubits)
-        for widthIdx in range(gridWidth):
-            circuitLayer = []
-            for heightIdx in range(gridHeight):
-                if(grid[widthIdx][heightIdx].getName() != '-'):
-                    if(grid[widthIdx][heightIdx].getName() == 'H'):
-                        circuit.h(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'X'):
-                        circuit.x(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'Y'):
-                        circuit.y(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'Z'):
-                        circuit.z(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'S'):
-                        circuit.s(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'T'):
-                        circuit.t(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'CNOT'):
-                        circuit.cnot(heightIdx, heightIdx + 1)
-                        heightIdx += 1
-        circuit.measure_all()
+        circuit = makeCircuit(circuit, instructions)     
+        circuit.measure_all()        
         # Save results
         simulator = Aer.get_backend('aer_simulator_density_matrix')
         self.results = simulator.run(circuit).result().get_counts(circuit)
@@ -271,38 +262,13 @@ class HamiltonionCuQuantumBackend:
         import cuquantum
         # Get results, store figure, normalize, apply phase scalar map
 # Do similar decomposition process
-        circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
-        for widthIdx in range(gridWidth):
-            for heightIdx in range(gridHeight):
-                if(grid[widthIdx][heightIdx].getName() != '-'):
-                    if(grid[widthIdx][heightIdx].getName() == 'CNOT'):
-                        circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
-                        circuitOperators[widthIdx][heightIdx+1] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
-                    else:
-                        circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
+        instructions = getInstructions(grid, gridWidth, gridHeight)
         numQubits = gridHeight
         numDepth = gridWidth
-        # Make qiskit gate
+
+        # Make qiskit circuit
         circuit = QuantumCircuit(numQubits)
-        for widthIdx in range(gridWidth):
-            circuitLayer = []
-            for heightIdx in range(gridHeight):
-                if(grid[widthIdx][heightIdx].getName() != '-'):
-                    if(grid[widthIdx][heightIdx].getName() == 'H'):
-                        circuit.h(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'X'):
-                        circuit.x(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'Y'):
-                        circuit.y(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'Z'):
-                        circuit.z(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'S'):
-                        circuit.s(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'T'):
-                        circuit.t(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'CNOT'):
-                        circuit.cnot(heightIdx, heightIdx + 1)
-                        heightIdx += 1
+        circuit = makeCircuit(circuit, instructions)    
                         
         myconverter = CircuitToEinsum(circuit, dtype='complex128', backend=np)
         # Compute the probability of certain qubits being 1, i.e. specific bitstring result
@@ -402,7 +368,7 @@ class DWaveBackend:
     settings = None
     histogramResult = None
     results = None
-    API_Token = "DEV-2a83ec13135e2944cebbeddf32592573221b3937"
+    API_Token = "NONE"
 
     def __init__(self, newSettings):
         self.settings = newSettings
@@ -420,8 +386,8 @@ class DWaveBackend:
         stop = False
         # Execute variable declarations
         for entry in self.settings.variableDeclarationsQUBO:
-        	if(len(entry) > 1):
-        		exec(entry)
+            if(len(entry) > 1):
+                exec(entry)
         # Extract objective function
         objectiveFunction = self.settings.objectiveQUBOS
         print(self.settings.objectiveQUBOS)
@@ -433,9 +399,11 @@ class DWaveBackend:
         # Add constraints
         stop = False
         for entry in self.settings.constraintsQUBO:
-        	if(len(entry) > 1):
-        		eval("cqm.add_constraint(" + entry + ")")
+            if(len(entry) > 1):
+                eval("cqm.add_constraint(" + entry + ")")
         # Use token to sample solutions and filter out infeasible ones
+        if(self.API_Token == "NONE"):
+            self.API_Token = get_api_key()
         from dwave.system import LeapHybridCQMSampler
         sampler = LeapHybridCQMSampler(token=self.API_Token)     
         sampleset = sampler.sample_cqm(cqm, label='QuboParsing')
@@ -456,7 +424,7 @@ class XanaduBackend:
     settings = None
     histogramResult = None
     results = None
-    API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICIwYTdjOGE5Yi1lMzdkLTQ0MzItOTU2OC0xNzI3YzEwNmYyMzEifQ.eyJpYXQiOjE2NTg2MTU5MzUsImp0aSI6IjE5NDNmYTU5LWYxZmMtNDczZS04ZDliLThjZGE2MGVmOGE5MyIsImlzcyI6Imh0dHBzOi8vcGxhdGZvcm0ueGFuYWR1LmFpL2F1dGgvcmVhbG1zL3BsYXRmb3JtIiwiYXVkIjoiaHR0cHM6Ly9wbGF0Zm9ybS54YW5hZHUuYWkvYXV0aC9yZWFsbXMvcGxhdGZvcm0iLCJzdWIiOiJmMmIwYmJkYi05NzJkLTRiZDgtYjZhOS0xNTU3MWY4NDVlNjMiLCJ0eXAiOiJPZmZsaW5lIiwiYXpwIjoicHVibGljIiwic2Vzc2lvbl9zdGF0ZSI6ImIyNTI4ZmZlLTUwNzUtNDMwYy05YWZkLTdiZDA0MmI1ZTEwYyIsInNjb3BlIjoicHVibGljLXJvbGVzIHByb2ZpbGUgZW1haWwgb2ZmbGluZV9hY2Nlc3MiLCJzaWQiOiJiMjUyOGZmZS01MDc1LTQzMGMtOWFmZC03YmQwNDJiNWUxMGMifQ.c0wXKPXBCqfB9hOoFCe7-Fp-oSJ8wY2Sa_Sgvmn4-Oc"
+    API_KEY = "NONE"
 
     def __init__(self, newSettings):
         self.settings = newSettings
@@ -530,6 +498,9 @@ class XanaduBackend:
                             heightIdx += 1
             ops.MeasureFock() | q # Assume fock measurement technique
 
+        if(self.API_Token == "NONE"):
+            self.API_Token = get_api_key()
+        
         # Save API token, ping for request
         import xcc
         from strawberryfields import RemoteEngine
@@ -567,7 +538,7 @@ class QiskitBackend:
     settings = None
     histogramResult = None
     results = None
-    API_KEY = "55b82f2dcb56e1a96a368905f14504a9c229c9cc212ab7b7f46039e087d54e201c3205f07ba1efed86d880fb82635a630803b072669020cd6eb43589f1abaa0d"
+    API_KEY = "NONE"
 
 
     def __init__(self, newSettings):
@@ -577,51 +548,26 @@ class QiskitBackend:
         self.API_KEY = api_string
     
     def sendRequest(self, gridWidth, gridHeight, grid):
-        # Same as before in Feynman
-        circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
-        for widthIdx in range(gridWidth):
-            for heightIdx in range(gridHeight):
-                if(grid[widthIdx][heightIdx].getName() != '-'):
-                    if(grid[widthIdx][heightIdx].getName() == 'CNOT'):
-                        circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
-                        circuitOperators[widthIdx][heightIdx+1] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
-                    else:
-                        circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
+        # Get results, store figure, normalize, apply phase scalar map
+# Do similar decomposition process
+        instructions = getInstructions(grid, gridWidth, gridHeight)
         numQubits = gridHeight
         numDepth = gridWidth
+
+        # Make qiskit circuit
         circuit = QuantumCircuit(numQubits)
-        for widthIdx in range(gridWidth):
-            circuitLayer = []
-            for heightIdx in range(gridHeight):
-                if(grid[widthIdx][heightIdx].getName() != '-'):
-                    if(grid[widthIdx][heightIdx].getName() == 'H'):
-                        circuit.h(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'X'):
-                        circuit.x(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'Y'):
-                        circuit.y(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'Z'):
-                        circuit.z(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'S'):
-                        circuit.s(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'T'):
-                        circuit.t(heightIdx)
-                    if(grid[widthIdx][heightIdx].getName() == 'CNOT'):
-                        circuit.cnot(heightIdx, heightIdx + 1)
-                        heightIdx += 1
+        circuit = makeCircuit(circuit, instructions)     
         circuit.measure_all()
-        # This time, use the QaSM provider
-        from qiskit import IBMQ
-        from qiskit.compiler import transpile, assemble
-        IBMQ.save_account(self.API_KEY, overwrite=True)
-        provider = IBMQ.load_account()
-        backend = provider.get_backend('ibmq_qasm_simulator')
-        transpiled = transpile(circuit, backend=backend)
-        qobj = assemble(transpiled, backend=backend, shots=1024)
-        job = backend.run(qobj)
-        print(job.status()) # Tell the user results are pending
+        if(self.API_KEY == "NONE"):
+            self.API_KEY = get_api_key()
+        
+        service = QiskitRuntimeService(channel="ibm_quantum", instance="ibm-q/open/main", token=self.API_KEY)
+        backend = service.least_busy(simulator=True)
+        sampler = Sampler(backend) 
+        job = sampler.run(circuit) 
+        result = job.result() 
         # Produce results
-        self.results = job.result().get_counts(circuit)
+        self.results = result.quasi_dists[0]
         fig = plt.figure(figsize = (20, 5))
         xVal = []
         yVal = []
@@ -629,7 +575,7 @@ class QiskitBackend:
         for _, y in self.results.items():
             total += y
         for a, b in self.results.items():
-            xVal.append(a)
+            xVal.append(str(bin(a))[2:])
             yVal.append((b / total) * 100)
 
         df = pd.DataFrame(
