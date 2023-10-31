@@ -15,10 +15,23 @@ import matplotlib.cm as cm
 import matplotlib as mpl
 import itertools
 import pandas as pd
+import strawberryfields as sf
+import cuquantum
+import xcc
+import xcc.commands
+import dimod
 from qiskit import QuantumCircuit
 from qiskit import Aer, transpile
+from qiskit import IBMQ
+from qiskit.compiler import transpile, assemble
 from qiskit_aer.library.save_instructions.save_statevector import save_statevector
 from BackendInterface import Backend
+from strawberryfields import ops
+from strawberryfields import RemoteEngine
+from cuquantum import contract
+from dwave.system import LeapHybridCQMSampler
+from cuquantum import CircuitToEinsum
+
 
 class HamiltonionBackend(Backend):
 	provider = "Local"
@@ -28,6 +41,7 @@ class HamiltonionBackend(Backend):
 	df = None
 	xVal = None
 	yVal = None
+	
 	def __init__(self, newSettings):
 		self.settings = newSettings
 	
@@ -105,7 +119,6 @@ class HamiltonionBackend(Backend):
 		sv = np.array(sv)
 		results = getAllPossibilities(sv, numQubits)
 		self.result = result
-		fig = plt.figure(figsize = (20, 5))
 		self.xVal = []
 		self.yVal = []
 		norm = mpl.colors.Normalize(vmin=0, vmax=np.pi)
@@ -133,14 +146,15 @@ class HamiltonionBackend(Backend):
 
 	def display(self):
 		df_sorted = self.df.sort_values('x')
+		
 		# Make graph
 		plt.bar(df_sorted['x'], df_sorted['y'], width = 0.4, color = df_sorted['phase'])
 		plt.xlabel("Computational Result")
 		plt.ylabel("Probability")
+		
 		# Empirical formula to find rotations
 		rotationAmount = math.floor(90/(1 + np.exp(-(((len(self.xVal))/3)-5))))
 		plt.xticks(rotation = rotationAmount)
-
 
 		norm = mpl.colors.Normalize(vmin=0, vmax=np.pi)
 		cmap = cm.hsv
@@ -172,15 +186,6 @@ class FeynmanBackend(Backend):
 	
 	def sendRequest(self, gridWidth, gridHeight, grid):
 		# Do similar decomposition process
-		circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
-		for widthIdx in range(gridWidth):
-			for heightIdx in range(gridHeight):
-				if(grid[widthIdx][heightIdx].getName() != '-'):
-					if(grid[widthIdx][heightIdx].getName() == 'CNOT'):
-						circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
-						circuitOperators[widthIdx][heightIdx+1] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
-					else:
-						circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
 		numQubits = gridHeight
 		
 		# Make qiskit gate
@@ -225,6 +230,7 @@ class FeynmanBackend(Backend):
 			)
 		)
 		# Same plotting as before
+
 	def display(self):
 		df_sorted = self.df.sort_values('x')
 		plt.bar(df_sorted['x'], df_sorted['y'], width = 0.4)
@@ -254,20 +260,7 @@ class HamiltonionCuQuantumBackend(Backend):
 		pass
 	
 	def sendRequest(self, gridWidth, gridHeight, grid):
-		from cuquantum import contract
-		from cuquantum import CircuitToEinsum
-		import cuquantum
 		# Get results, store figure, normalize, apply phase scalar map
-        # Do similar decomposition process
-		circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
-		for widthIdx in range(gridWidth):
-			for heightIdx in range(gridHeight):
-				if(grid[widthIdx][heightIdx].getName() != '-'):
-					if(grid[widthIdx][heightIdx].getName() == 'CNOT'):
-						circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
-						circuitOperators[widthIdx][heightIdx+1] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
-					else:
-						circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
 		numQubits = gridHeight
 
 		# Make qiskit gate
@@ -404,8 +397,6 @@ class DWaveBackend(Backend):
 		self.API_Token = api_string
 	
 	def sendRequest(self):
-		import dimod
-
 		# Initalize a constraint quadratic model
 		cqm = dimod.CQM()
 		
@@ -426,7 +417,6 @@ class DWaveBackend(Backend):
 			if(len(entry) > 1):
 				eval("cqm.add_constraint(" + entry + ")")
 		# Use token to sample solutions and filter out infeasible ones
-		from dwave.system import LeapHybridCQMSampler
 		sampler = LeapHybridCQMSampler(token=self.API_Token)     
 		self.sampleset = sampler.sample_cqm(cqm, label='QuboParsing')
 		self.sampleset = self.sampleset.filter(lambda row: row.is_feasible)
@@ -459,76 +449,52 @@ class XanaduBackend(Backend):
 		self.API_KEY = api_string
 	
 	def sendRequest(self, gridWidth, gridHeight, grid):
-		# Similar decomposition, expanded to support photonic multi-gate
-		circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
-		for widthIdx in range(gridWidth):
-			for heightIdx in range(gridHeight):
-				if(grid[widthIdx][heightIdx].getName() != '-'):
-					if("PP" not in grid[widthIdx][heightIdx].getName() or len(grid[widthIdx][heightIdx].getName()) >= 3):
-						circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
-						circuitOperators[widthIdx][heightIdx+1] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
-					else:
-						circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
 		numQubits = gridHeight
-		import strawberryfields as sf
-		from strawberryfields import ops
 
 		# Assume fock measurement
 		# measurementType = ["F" for i in range(numQubits)]
 		# Initalize program
 		circuit = sf.Program(numQubits)
 		with circuit.context as q:
+			gate_operations = {
+				"PD": (ops.Dgate, 2),
+				"PX": (ops.Xgate, 1),
+				"PZ": (ops.Zgate, 1),
+				"PS": (ops.Sgate, 1),
+				"PR": (ops.Rgate, 1),
+				"PP": (ops.Pgate, 1),
+				"PV": (ops.Vgate, 1),
+				"PF": (ops.Fouriergate, 0),
+				"PPV": (ops.Vacuum, 0),
+				"PPC": (ops.Coherent, 2),
+				"PPF": (ops.Fock, 1),
+				"PBS": (ops.BSgate, 2, True),
+				"PMZ": (ops.MZgate, 2, True),
+				"PS2": (ops.S2gate, 2, True),
+				"PCX": (ops.CXgate, 1, True),
+				"PCZ": (ops.CZgate, 1, True),
+				"PCK": (ops.CKgate, 1, True)
+			}
+
 			for widthIdx in range(gridWidth):
-				for heightIdx in range(gridHeight):
-					# Load up gates
-					if(grid[widthIdx][heightIdx].getName() != '-'):
-						if(grid[widthIdx][heightIdx].getName() == "PD"):
-							ops.Dgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0], self.settings.specialGridSettings[(widthIdx, heightIdx)][1]) | q[widthIdx]
-						if(grid[widthIdx][heightIdx].getName() == "PX"):
-							ops.Xgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | q[widthIdx]
-						if(grid[widthIdx][heightIdx].getName() == "PZ"):
-							ops.Zgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | q[widthIdx]
-						if(grid[widthIdx][heightIdx].getName() == "PS"):
-							ops.Sgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | q[widthIdx]
-						if(grid[widthIdx][heightIdx].getName() == "PR"):
-							ops.Rgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | q[widthIdx]
-						if(grid[widthIdx][heightIdx].getName() == "PP"):
-							ops.Pgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | q[widthIdx]
-						if(grid[widthIdx][heightIdx].getName() == "PV"):
-							ops.Vgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | q[widthIdx]
-						if(grid[widthIdx][heightIdx].getName() == "PF"):
-							ops.Fouriergate() | q[widthIdx]
-						if(grid[widthIdx][heightIdx].getName() == "PPV"):
-							ops.Vacuum() | q[widthIdx]
-						if(grid[widthIdx][heightIdx].getName() == "PPC"):
-							ops.Coherent(self.settings.specialGridSettings[(widthIdx, heightIdx)][0], self.settings.specialGridSettings[(widthIdx, heightIdx)][1]) | q[widthIdx]
-						if(grid[widthIdx][heightIdx].getName() == "PPF"):
-							ops.Fock(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | q[widthIdx]
-						if(grid[widthIdx][heightIdx].getName() == "PBS"):
-							ops.BSgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0], self.settings.specialGridSettings[(widthIdx, heightIdx)][1]) | (q[widthIdx], q[widthIdx + 1])
+				heightIdx = 0
+				while heightIdx < gridHeight:
+					gate_name = grid[widthIdx][heightIdx].getName()
+					if gate_name in gate_operations:
+						op, num_params, is_dual_qubit = gate_operations[gate_name] + (False,)
+						params = self.settings.specialGridSettings[(widthIdx, heightIdx)][:num_params]
+						if is_dual_qubit:
+							op(*params) | (q[widthIdx], q[widthIdx + 1])
 							heightIdx += 1
-						if(grid[widthIdx][heightIdx].getName() == "PMZ"):
-							ops.MZgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0], self.settings.specialGridSettings[(widthIdx, heightIdx)][1]) | (q[widthIdx], q[widthIdx + 1])
-							heightIdx += 1
-						if(grid[widthIdx][heightIdx].getName() == "PS2"):
-							ops.S2gate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0], self.settings.specialGridSettings[(widthIdx, heightIdx)][1]) | (q[widthIdx], q[widthIdx + 1])
-							heightIdx += 1
-						if(grid[widthIdx][heightIdx].getName() == "PCX"):
-							ops.CXgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | (q[widthIdx], q[widthIdx + 1])
-							heightIdx += 1
-						if(grid[widthIdx][heightIdx].getName() == "PCZ"):
-							ops.CZgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | (q[widthIdx], q[widthIdx + 1])
-							heightIdx += 1
-						if(grid[widthIdx][heightIdx].getName() == "PCK"):
-							ops.CKgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | (q[widthIdx], q[widthIdx + 1])
-							heightIdx += 1
-			ops.MeasureFock() | q # Assume fock measurement technique
+						else:
+							op(*params) | q[widthIdx]
+					heightIdx += 1
+
+			ops.MeasureFock() | q  # Assume fock measurement technique
+
 
 		# Save API token, ping for request
-		import xcc
-		from strawberryfields import RemoteEngine
 		xcc.Settings(REFRESH_TOKEN=self.API_KEY).save()
-		import xcc.commands
 		xcc.commands.ping()
 
 		# Get remote results with Guassian Technique backend
@@ -549,6 +515,7 @@ class XanaduBackend(Backend):
 		print("Saved values...")
 		# Save relevant infromation
 		#fig = plt.figure(figsize = (20, 5))
+    
 	def display(self):
 		plt.bar(self.result.keys(), self.result.values(), 1, color='b')
 		plt.xlabel("Fock Measurement State (binary representation for 'qubit' analysis)")
@@ -576,15 +543,6 @@ class QiskitBackend(Backend):
 	
 	def sendRequest(self, gridWidth, gridHeight, grid):
 		# Same as before in Feynman
-		circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
-		for widthIdx in range(gridWidth):
-			for heightIdx in range(gridHeight):
-				if(grid[widthIdx][heightIdx].getName() != '-'):
-					if(grid[widthIdx][heightIdx].getName() == 'CNOT'):
-						circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
-						circuitOperators[widthIdx][heightIdx+1] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
-					else:
-						circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
 		numQubits = gridHeight
 		circuit = QuantumCircuit(numQubits)
 		for widthIdx in range(gridWidth):
@@ -607,8 +565,6 @@ class QiskitBackend(Backend):
 						heightIdx += 1
 		circuit.measure_all()
 		# This time, use the QaSM provider
-		from qiskit import IBMQ
-		from qiskit.compiler import transpile, assemble
 		IBMQ.save_account(self.API_KEY, overwrite=True)
 		provider = IBMQ.load_account()
 		backend = provider.get_backend('ibmq_qasm_simulator')
@@ -618,7 +574,6 @@ class QiskitBackend(Backend):
 		print(job.status()) # Tell the user results are pending
 		# Produce results
 		self.results = job.result().get_counts(circuit)
-		fig = plt.figure(figsize = (20, 5))
 		self.xVal = []
 		self.yVal = []
 		total = 0
@@ -634,6 +589,7 @@ class QiskitBackend(Backend):
 				y=self.yVal
 			)
 		)
+	
 	def display(self):
 		df_sorted = self.df.sort_values('x')
 		plt.bar(df_sorted['x'], df_sorted['y'], width = 0.4)
