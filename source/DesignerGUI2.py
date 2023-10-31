@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QGridLayout, QPushButton, QLineEdit, QLabel
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QGridLayout, QPushButton, QLineEdit, QLabel, QScrollArea
 
 class CustomWidget(QPushButton):
     def __init__(self, text, parent=None):
@@ -71,13 +71,16 @@ class MainWindow(QMainWindow):
         layout.addWidget(height_label, 2, 0)
         layout.addWidget(self.height_input, 2, 1)
 
-        # Create a grid (right side) for drag-and-drop
+        # Create a scrollable grid (right side) for drag-and-drop
         self.grid_widget = GridWidget(1, 1)  # Default grid size
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidget(self.grid_widget)
+        self.scroll_area.setWidgetResizable(True)
 
         self.width_input.textChanged.connect(self.updateGridSize)
         self.height_input.textChanged.connect(self.updateGridSize)
 
-        layout.addWidget(self.grid_widget, 0, 1)
+        layout.addWidget(self.scroll_area, 0, 1)
         layout.setColumnStretch(1, 1)  # Allow resizing of the right grid
 
         self.setGeometry(100, 100, 800, 600)
@@ -97,6 +100,7 @@ class MainWindow(QMainWindow):
             widget.deleteLater()
 
         self.grid_widget = GridWidget(width, height)
+        self.scroll_area.setWidget(self.grid_widget)
 
 def main():
     app = QApplication(sys.argv)
