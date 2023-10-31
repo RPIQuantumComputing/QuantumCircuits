@@ -73,19 +73,23 @@ class MainWindow(QMainWindow):
 
         # Create a grid (right side) for drag-and-drop
         self.grid_widget = GridWidget(1, 1)  # Default grid size
-        layout.addWidget(self.grid_widget, 0, 1)
-        layout.setColumnStretch(1, 1)  # Allow resizing of the right grid
 
         self.width_input.textChanged.connect(self.updateGridSize)
         self.height_input.textChanged.connect(self.updateGridSize)
+
+        layout.addWidget(self.grid_widget, 0, 1)
+        layout.setColumnStretch(1, 1)  # Allow resizing of the right grid
 
         self.setGeometry(100, 100, 800, 600)
         self.setWindowTitle('Custom PyQt5 Widget')
         self.show()
 
     def updateGridSize(self):
-        width = int(self.width_input.text())
-        height = int(self.height_input.text())
+        width_text = self.width_input.text()
+        height_text = self.height_input.text()
+
+        width = int(width_text) if width_text.isdigit() else 1
+        height = int(height_text) if height_text.isdigit() else 1
 
         grid_layout = self.grid_widget.grid_layout
         for i in reversed(range(grid_layout.count())):
@@ -93,8 +97,6 @@ class MainWindow(QMainWindow):
             widget.deleteLater()
 
         self.grid_widget = GridWidget(width, height)
-        grid_layout = self.grid_widget.grid_layout
-        grid_layout.addWidget(self.grid_widget, 0, 0)
 
 def main():
     app = QApplication(sys.argv)
