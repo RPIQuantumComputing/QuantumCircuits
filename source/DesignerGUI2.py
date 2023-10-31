@@ -62,7 +62,7 @@ class MainWindow(QMainWindow):
 
         # Create input fields for grid width and height
         width_label = QLabel("Grid Width:")
-        height_label = QLabel("Grid Height:")
+        height_label = QLabel("Grid Height")
         self.width_input = QLineEdit()
         self.height_input = QLineEdit()
 
@@ -72,13 +72,29 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.height_input, 2, 1)
 
         # Create a grid (right side) for drag-and-drop
-        grid_widget = GridWidget(1, 1)  # Default grid size
-        layout.addWidget(grid_widget, 0, 1)
+        self.grid_widget = GridWidget(1, 1)  # Default grid size
+        layout.addWidget(self.grid_widget, 0, 1)
         layout.setColumnStretch(1, 1)  # Allow resizing of the right grid
+
+        self.width_input.textChanged.connect(self.updateGridSize)
+        self.height_input.textChanged.connect(self.updateGridSize)
 
         self.setGeometry(100, 100, 800, 600)
         self.setWindowTitle('Custom PyQt5 Widget')
         self.show()
+
+    def updateGridSize(self):
+        width = int(self.width_input.text())
+        height = int(self.height_input.text())
+
+        grid_layout = self.grid_widget.grid_layout
+        for i in reversed(range(grid_layout.count())):
+            widget = grid_layout.itemAt(i).widget()
+            widget.deleteLater()
+
+        self.grid_widget = GridWidget(width, height)
+        grid_layout = self.grid_widget.grid_layout
+        grid_layout.addWidget(self.grid_widget, 0, 0)
 
 def main():
     app = QApplication(sys.argv)
