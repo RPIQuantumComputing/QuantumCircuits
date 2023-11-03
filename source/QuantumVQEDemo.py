@@ -35,9 +35,12 @@ import plotly
 
 import plotly.express as px
 import plotly.graph_objects as go
+import plotly.io as pio
 
 import webbrowser
 import os
+
+#pio.renderers.default = 'plotly_mimetype'
 
 costs = []
 # This is basically QuriPart's competition code with adjustments, will change to my competition code later
@@ -192,57 +195,26 @@ class Ui_QuantumSimulationGUI(object):
         _translate = QtCore.QCoreApplication.translate
         QuantumSimulationGUI.setWindowTitle(_translate("QuantumSimulationGUI", "MainWindow"))
 
-    def draw_spheres(self, sphere_params):
-        sphere_data = []  # List to hold the Surface objects for each sphere
-        max_radius = max([params['radius'] for params in sphere_params])  # Determine the max radius for setting axis limits
-    
-        for params in sphere_params:
-        	# Unpack sphere parameters
-            x, y, z, radius = params['x'], params['y'], params['z'], params['radius']
-        
-        	# Create the theta and phi angles for the parametric plot
-            phi, theta = np.mgrid[0.0:np.pi:100j, 0.0:2.0*np.pi:50j]
-        
-        	# Parametric equations for the sphere
-            x_sphere = x + radius * np.sin(phi) * np.cos(theta)
-            y_sphere = y + radius * np.sin(phi) * np.sin(theta)
-            z_sphere = z + radius * np.cos(phi)
-        
-        	# Create the Surface object for the sphere and append to sphere_data list
-            sphere = go.Surface(x=x_sphere, y=y_sphere, z=z_sphere, colorscale='Viridis', showscale=False, title=params['name'])
-            sphere_data.append(sphere)
-    
-        # Define the layout for the plot, including title and axis properties
-        layout = go.Layout(
-            title="Molecule",
-            scene=dict(
-                xaxis=dict(nticks=4, range=[-max_radius-5, max_radius+5]),
-                yaxis=dict(nticks=4, range=[-max_radius-5, max_radius+5]),
-                zaxis=dict(nticks=4, range=[-max_radius-5, max_radius+5]),
-                aspectratio=dict(x=1, y=1, z=1)
-            )
-        )
-        # Create and show the figure with the aggregated sphere_data
-        fig = go.Figure(data=sphere_data, layout=layout)
-        fig.write_html('example_figure.html', auto_open=True)
-        filename = 'file:///'+os.getcwd()+'/' + 'example_figure.html'
-        webbrowser.open_new_tab(filename)
-        try:
-           os.system("google-chrome -url ./example_figure.html --no-sandbox")
-        except:
-           pass
+    def drawSphere(self, position, radius, resolution=20):
+        #source :https://stackoverflow.com/questions/70977042/how-to-plot-spheres-in-3d-with-plotly-or-another-library
+        x, y, z = position
+
+        u, v = np.mgrid[0:2*np.pi:resolution*2j, 0:np.pi:resolution*1j]
+
+        X = radius * np.cos(u)*np.sin(v) + x
+        Y = radius * np.sin(u)*np.sin(v) + y
+        Z = radius * np.cos(v) + z
+
+        #print(f"\tSphere drawn at positon {x}, {y}, {z}")
+        return (X, Y, Z)
 
     def generate3dMolecule(self, molecule):
         data = []
+        print( '\n' + ('-' * 80) + "\nParsing atoms...\n", flush=True)
 
-        max_radius = 0.0
-        for atom in molecule:
-            #seperate into element and position
-            symbol = atom[0]
-            si = element(symbol)
-            r = si.atomic_radius
-            if(r > max_radius):
-                max_radius = r
+        symbols = []
+        positions = []
+        radii = []
 
         for atom in molecule:
             #seperate into element and position
@@ -250,42 +222,64 @@ class Ui_QuantumSimulationGUI(object):
             pos = atom[1]
 
             #find the atomic radius of the element
-            si = element(symbol)
-            
-            r = si.atomic_radius / max_radius
+            r = element(symbol).atomic_radius
+
+            #append values to lists
+            symbols.append(symbol)
+            positions.append(pos)
+            radii.append(r)
+
+        maxRadius = max(radii)
+
+        for i in range(len(symbols)):
+            symbol = symbols[i]
+            pos = positions[i]
+            r = radii[i]/maxRadius
 
             x, y, z = pos
+            print(f"\t - {symbol}, position: ({x}, {y}, {z}), radius: {r}", flush=True)
 
-            entry = dict()
-            entry['x'] = x
-            entry['y'] = y
-            entry['z'] = z
-            entry['radius'] = r
-            entry['name'] = symbol
-            data.append(entry)
+            (x_pns_surface, y_pns_surface, z_pns_suraface) = self.drawSphere(pos, r)
+            data.append(go.Surface(x=x_pns_surface, y=y_pns_surface, z=z_pns_suraface, opacity=0.5))
 
-        self.draw_spheres(data)
+        #find the maxium atomic radius
+
+        print("\nGENERATING 3D MODEL---\n" + ('-' * 80), flush=True)
+        fig = go.Figure(data=data)
+        fig.show()
 
     def parseLine(self, line):
         #line format: <element symbol> (x, y, z)
         divided = line.split("(")
 
+        if(len(divided) == 1):
+            return None 
+        
         element = divided[0][:-1] 
         position = [int(component) for component in ((divided[1][:-1]).split(","))]
+
+        #print(f"element: {element},     position: {position}", flush=True)
 
         return [element, position]
       
     def on_compute_integrals_clicked(self):
         elements = []
+        user_input = self.textEdit.toPlainText()
+        lines = user_input.split("\n")
+
+        for line in lines:
+                parsed = self.parseLine(line)
+
+                if(parsed != None):
+                    elements.append(parsed)
+
+        #print(elements)
+
+        #make a 3d model of the molecule
+        self.generate3dMolecule(elements)
+        
         try:
-            user_input = self.textEdit.toPlainText()
-            lines = user_input.split("\n")
 
-            for line in lines:
-               elements.append(self.parseLine(line))
-
-            #make a 3d model of the molecule
-            self.generate3dMolecule(elements)
             # Guassian-Type Molecule, M defines a molecule object
             self.user_mol = gto.M(atom=elements, verbose=0)
             # This will run a self-consistent field (iterative electronic structure until stabalization is found)
