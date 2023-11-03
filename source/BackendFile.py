@@ -36,6 +36,8 @@ from qiskit.circuit.random import random_circuit
 from qiskit.quantum_info import SparsePauliOp 
 from qiskit_ibm_runtime import QiskitRuntimeService, Estimator 
 from qiskit_ibm_runtime import Sampler
+from qiskit_aer.noise import NoiseModel
+from qiskit.test.mock import FakeVigo
 
 def get_api_key():
     root = tk.Tk()
@@ -115,6 +117,16 @@ class HamiltonionBackend:
         circuit = makeCircuit(circuit, instructions)     
         circuit.save_statevector()
 
+        # Make noise model
+        device_backend = FakeVigo()
+        #coupling_map = device_backend.configuration().coupling_map
+        isNoise = self.settings.gate_error or self.settings.readout_error or (self.settings.temperature != 0)
+        noise_model = NoiseModel.from_backend(device_backend,
+                                              gate_error=self.settings.gate_error,
+                                              readout_error=self.settings.readout_error,
+                                              thermal_relaxation=self.settings.temperature != 0,
+                                              temperature=self.settings.temperature)
+
         # Compute the probability of certain qubits being 1, i.e. specific bitstring result
         def returnProbabilitiy(statevector, qubitsActive):
             projectTo = np.array([1])
@@ -190,6 +202,14 @@ class HamiltonionBackend:
         plt.title("Probability Distribution of Given Quantum Circuit")
         self.histogramResult = plt
         self.results = results
+
+        # Noise stuff
+        circuit.measure_all()
+        simulator = Aer.get_backend('aer_simulator')
+        #basis_gates = noise_model.basis_gates
+        result_noise = execute(circuit, simulator, noise_model=noise_model).result()
+        counts_noise = result_noise.get_counts(circuit)
+        plot_histogram(counts_noise, title="Probability graph with noise")
 
 class FeynmanBackend:
     provider = "Local"
