@@ -8,15 +8,10 @@ import networkx as nx
 
 # Import files
 from PartialSimulationTab import PartialSimulationTab
-from DesignerGUI import GraphicsManager, GateManager, SimulatorSettings, GridManager, EmailManager
+from DesignerGUI import GraphicsManager, GateManager, SimulatorSettings, GridManager
 
 class GUIHelper:
     # For field elements that complete change layout
-    def forceUpdate():
-        from Window import Window
-        window = Window()
-        window.show()
-
     def initial(GateM: GateManager, SS: SimulatorSettings, row, col):
         gate_dict = {}
         if (SS.photonicMode):

@@ -392,7 +392,7 @@ class Window(QMainWindow):
         
         self.GateM.customGates[customGateName[0]] = customGrid
 
-        GUIHelper.forceUpdate()
+        self.centralWidget
         self.grid.updateGUILayout()
         print("--------------------------------------")
         for i in range(len(self.GridM.grid)):
