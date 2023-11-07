@@ -72,7 +72,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.height_input, 2, 1)
 
         # Create a scrollable grid (right side) for drag-and-drop
-        self.grid_widget = GridWidget(1, 1)  # Default grid size
+        self.grid_widget = GridWidget(3, 3)  # Default grid size
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidget(self.grid_widget)
         self.scroll_area.setWidgetResizable(True)
