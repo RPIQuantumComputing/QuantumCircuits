@@ -10,7 +10,7 @@ from pathlib import Path
 from DwaveTab import DWaveTab
 from IndicSelectWindow import IndicSelectWindow
 from PartialSimulationTab import PartialSimulationTab
-from source.DesignerGUI import GraphicsManager, GridManager, GateManager, SimulatorSettings, EmailManager
+from DesignerGUI import GraphicsManager, GridManager, GateManager, SimulatorSettings, EmailManager
 from GUIHelper import GUIHelper
 
 # the main window for display

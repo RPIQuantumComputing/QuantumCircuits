@@ -26,6 +26,9 @@ from qiskit import Aer, transpile
 from qiskit.compiler import transpile
 from qiskit_aer.library.save_instructions.save_statevector import save_statevector
 
+
+PC = ParseCircuit()
+
 def get_api_key():
     root = Tk()
     root.withdraw()  # Hide the main window
@@ -46,8 +49,8 @@ def getGrid(grid, gridWidth, gridHeight):
 
 def getInstructions(object_grid, gridWidth, gridHeight):
     grid = getGrid(object_grid, gridWidth, gridHeight)
-    node = ParseCircuit.parse(grid)
-    return ParseCircuit.get_instructions(node)
+    node = PC.parse(grid=grid)
+    return PC.get_instructions(node)
 
 def makeCircuit(qc, gate_sequence):
     # Iterate through the gate sequence and add gates to the circuit
@@ -206,7 +209,6 @@ class FeynmanBackend:
         # Save results
         simulator = Aer.get_backend('aer_simulator_density_matrix')
         self.results = simulator.run(circuit).result().get_counts(circuit)
-        fig = plt.figure(figsize = (20, 5))
         xVal = []
         yVal = []
         total = 0

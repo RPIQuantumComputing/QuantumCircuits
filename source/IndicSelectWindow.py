@@ -6,7 +6,7 @@ from threading import *
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import tempfile
 
-from source.DesignerGUI import GraphicsManager, GridManager, GateManager, SimulatorSettings
+from DesignerGUI import GraphicsManager, GridManager, GateManager, SimulatorSettings
 from GUIHelper import GUIHelper
 
 # the main workbench of qcd, a grid that supports drag & drop

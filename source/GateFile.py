@@ -18,7 +18,7 @@ class IndividualGate:
 
     # Some getters and setters for field elements
     def getName(self):
-        return self.gate_name;
+        return self.gate_name
 
     def setName(self, newName):
         self.gate_name = newName

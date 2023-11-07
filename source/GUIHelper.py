@@ -8,7 +8,7 @@ import networkx as nx
 
 # Import files
 from PartialSimulationTab import PartialSimulationTab
-from source.DesignerGUI import GraphicsManager, GateManager, SimulatorSettings, GridManager, EmailManager
+from DesignerGUI import GraphicsManager, GateManager, SimulatorSettings, GridManager, EmailManager
 
 class GUIHelper:
     # For field elements that complete change layout
