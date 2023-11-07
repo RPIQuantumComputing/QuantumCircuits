@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import *
 
 # Imported Python files
 from Window import Window
-from DesignerGUI_new import GraphicsManager, GridManager, GateManager, SimulatorSettings, EmailManager
+from source.DesignerGUI import GraphicsManager, GridManager, GateManager, SimulatorSettings, EmailManager
 
 
 class Main():

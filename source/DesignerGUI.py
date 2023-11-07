@@ -1,4 +1,3 @@
-import sys
 import DesignerFile
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
@@ -7,8 +6,9 @@ from PIL import Image
 from threading import *
 from redmail import EmailSender
 
-# Load up all graphic images, Singleton design pattern
-gateToImage = {" ": Image.open("../assets/EMPTY.png"), "-": Image.open("../assets/GATE.png"), "H": Image.open("../assets/H.png"),
+class GraphicsManager:
+    def __init__(self):
+        self.gateToImage = {" ": Image.open("../assets/EMPTY.png"), "-": Image.open("../assets/GATE.png"), "H": Image.open("../assets/H.png"),
                "T": Image.open("../assets/T.png"), "S": Image.open("../assets/S.png"), "X": Image.open("../assets/X.png"), "Y": Image.open("../assets/Y.png"),
                "Z": Image.open("../assets/Z.png"), "CNOT": Image.open("../assets/CNOT.png"),
                "PBS": Image.open("../assets/PBS.png"), "PCK": Image.open("../assets/PCK.png"), "PCX": Image.open("../assets/PCX.png"),
@@ -16,53 +16,36 @@ gateToImage = {" ": Image.open("../assets/EMPTY.png"), "-": Image.open("../asset
                "PMZ": Image.open("../assets/PMZ.png"), "PPC": Image.open("../assets/PPC.png"), "PPF": Image.open("../assets/PPF.png"),
                "PPV": Image.open("../assets/PPV.png"), "PS": Image.open("../assets/PS.png"), "PS2": Image.open("../assets/PS2.png"),
                "PV": Image.open("../assets/PV.png"), "PX": Image.open("../assets/PX.png"), "PZ": Image.open("../assets/PZ.png")}
+        self.currentWidth = 8
+        self.currentHeight = 6
+        self.offSetHorizontal = 3
+        self.hamiltonian = False
 
-# Same grid information, offSetHorizontal offsets to the play field (where user puts gates)
-# from the gate storage and barrier positions
-currentWidth = 8
-currentHeight = 6
-offSetHorizontal = 3
+class GridManager:
+    def __init__(self, GM: GraphicsManager):
+        self.grid = [["-" for i in range(GM.currentWidth + GM.offSetHorizontal)] for j in range(GM.currentHeight)]
+        self.priorBarrier = [-1, -1, -1, -1]
+        self.designer = DesignerFile.Designer(GM.currentHeight, GM.currentWidth)
 
-customGates = {}
-positionsWithCustomGates = {(-1, -1): "NA"}
-undoStack = []
-redoStack = []
+class GateManager:
+    def __init__(self):
+        self.customGates = {}
+        self.positionsWithCustomGates = {(-1, -1): "NA"}
+        self.undoStack = []
+        self.redoStack = []
 
-# Default to the "-" gate, store previous position of barrier
-grid = [["-" for i in range(currentWidth + offSetHorizontal)]
-        for j in range(currentHeight)]
-priorBarrier = [-1, -1, -1, -1]
+class SimulatorSettings:
+    def __init__(self):
+        self.needToUpdate = False
+        self.photonicMode = False
+        self.DWaveVar = ""
+        self.DWaveCon = ""
+        self.DwaveObjective = ""
+        #self.cuQuantumTab = PartialSimulationTab()
+        self.cuQuantumBitStrings = []
+        self.cuQuantumGateSplit = 0
+        self.cuQuantumConfig = [0, 1, 2, 3]
 
-# Initialize Designer
-designer = DesignerFile.Designer(currentHeight, currentWidth)
-
-# Various graphics settings
-hamiltonian = False
-needToUpdate = False
-photonicMode = False
-
-# Specific global state for DWave Annealer
-DWaveVar = ""
-DWaveCon = ""
-DwaveObjective = ""
-
-# Specific global state for cuQuantum
-cuQuantumBitStrings = []
-cuQuantumGateSplit = 0
-cuQuantumConfig = [0, 1, 2, 3]
-
-gmail = EmailSender(
-    host='smtp.office365.com',
-    port=587,
-    username="quantumcircuits@outlook.com",
-    password="dylansheils0241"
-)
-
-
-# Create the application, window, and close application if asked
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    cuQuantumTab = PartialSimulationTab()
-    window = Window()
-    window.show()
-    sys.exit(app.exec_())
+class EmailManager:
+    def __init__(self, host, port, username, password):
+        self.gmail = EmailSender(host=host, port=port, username=username, password=password)

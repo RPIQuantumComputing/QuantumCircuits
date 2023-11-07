@@ -1,5 +1,5 @@
 import SettingsFile
-import BackendFile
+import BackendFile as BackendFile
 
 # Makes a simulation object
 class Simulation:

@@ -8,13 +8,12 @@ import networkx as nx
 
 # Import files
 from PartialSimulationTab import PartialSimulationTab
-from DesignerGUI_new import GraphicsManager, GateManager, SimulatorSettings, GridManager
+from source.DesignerGUI import GraphicsManager, GateManager, SimulatorSettings, GridManager, EmailManager
 
 class GUIHelper:
     # For field elements that complete change layout
     def forceUpdate():
         from Window import Window
-        window.close()
         window = Window()
         window.show()
 

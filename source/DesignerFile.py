@@ -301,9 +301,9 @@ class Designer:
             couplingMapping.append([qubitIdx, qubitIdx + 1])
         # Save transpilation result
         simplified = transpile(circuit, backend=backend, coupling_map=couplingMapping, optimization_level=3)
-        simplified.draw(output='mpl', filename='simplified.png') 
+        simplified.draw(output='mpl', filename='../assets/simplified.png') 
         # Plot result
         import matplotlib.image as mpimg
-        img = mpimg.imread('simplified.png')
+        img = mpimg.imread('../assets/simplified.png')
         imgplot = plt.imshow(img)
         plt.show()

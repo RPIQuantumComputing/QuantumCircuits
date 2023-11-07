@@ -1,7 +1,7 @@
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
-from DesignerGUI_new import SimulatorSettings
+from source.DesignerGUI import SimulatorSettings
 
 # a Qdialog that pops up when use clicks the 'DWave' button on toolbar
 class DWaveTab(QDialog):
