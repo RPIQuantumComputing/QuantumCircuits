@@ -26,6 +26,7 @@ class GridWidget(QWidget):
             row = []
             for j in range(self.width):
                 input_box = QLineEdit()
+                input_box.setReadOnly(True)  # Make the input box non-editable
                 row.append(input_box)
                 self.grid_layout.addWidget(input_box, i, j)
             self.grid.append(row)
