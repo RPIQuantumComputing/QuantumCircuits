@@ -90,14 +90,6 @@ class HamiltonionBackend:
                         heightIdx += 1
         circuit.save_statevector()
 
-        #coupling_map=coupling_map,
-        circuit.measure_all()
-        simulator = Aer.get_backend('aer_simulator')
-        #basis_gates = noise_model.basis_gates
-        result_noise = execute(circuit, simulator, noise_model=noise_model).result()
-        counts_noise = result_noise.get_counts(circuit)
-        plot_histogram(counts_noise, title="Probability graph with noise")
-
         # Compute the probability of certain qubits being 1, i.e. specific bitstring result
         def returnProbabilitiy(statevector, qubitsActive):
             projectTo = np.array([1])
@@ -124,9 +116,9 @@ class HamiltonionBackend:
             return result
         
         # Save results
-        #simulator = Aer.get_backend('aer_simulator') UNCOMMENT THIS
+        simulator = Aer.get_backend('aer_simulator')
         circ = transpile(circuit, simulator)
-
+        
         # Run and get statevector
         result = simulator.run(circ).result()
         sv = result.get_statevector(circ)
@@ -159,19 +151,37 @@ class HamiltonionBackend:
             )
         )
 
-        df_sorted = df.sort_values('x')
-        # Make graph
-        plt.bar(df_sorted['x'], df_sorted['y'], width = 0.4, color = df_sorted['phase'])
-        plt.xlabel("Computational Result")
-        plt.ylabel("Probability")
-        # Empirical formula to find rotations
-        rotationAmount = math.floor(90/(1 + np.exp(-(((len(xVal))/3)-5))))
-        plt.xticks(rotation = rotationAmount)
-        cbar = plt.colorbar(m)
-        cbar.set_label('Relative Phase of State (Radians)', rotation=-90, labelpad=20)
-        plt.title("Probability Distribution of Given Quantum Circuit")
-        self.histogramResult = plt
-        self.results = results
+        if (isNoise):
+            # Noise model measuring
+            circuit.measure_all()
+            #simulator = Aer.get_backend('aer_simulator')
+            #basis_gates = noise_model.basis_gates
+            result_noise = execute(circuit, simulator, noise_model=noise_model).result()
+            counts_noise = result_noise.get_counts(circuit)
+            keys = list(map(lambda x: x, counts_noise))
+            values = list(map(lambda x: counts_noise[x], keys))
+            bars = plt.bar(keys, values, width = 0.4)
+            plt.title("Counts of Given Quantum Circuit")
+            plt.xlabel("Computational Result")
+            plt.ylabel("Counts")
+            plt.bar_label(bars)
+            self.histogramResult = plt
+            self.results = results
+
+        else:
+            df_sorted = df.sort_values('x')
+            # Make graph
+            plt.bar(df_sorted['x'], df_sorted['y'], width = 0.4, color = df_sorted['phase'])
+            plt.xlabel("Computational Result")
+            plt.ylabel("Probability")
+            # Empirical formula to find rotations
+            rotationAmount = math.floor(90/(1 + np.exp(-(((len(xVal))/3)-5))))
+            plt.xticks(rotation = rotationAmount)
+            cbar = plt.colorbar(m)
+            cbar.set_label('Relative Phase of State (Radians)', rotation=-90, labelpad=20)
+            plt.title("Probability Distribution of Given Quantum Circuit")
+            self.histogramResult = plt
+            self.results = results
 
         
 
