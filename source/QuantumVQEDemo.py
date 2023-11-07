@@ -42,6 +42,8 @@ import os
 
 #pio.renderers.default = 'plotly_mimetype'
 
+#run export DISPLAY=:0.0
+
 costs = []
 # This is basically QuriPart's competition code with adjustments, will change to my competition code later
 # right now, though, I don't want to add a few dependencies and mess up the docker container
@@ -207,6 +209,16 @@ class Ui_QuantumSimulationGUI(object):
 
         #print(f"\tSphere drawn at positon {x}, {y}, {z}")
         return (X, Y, Z)
+    
+    def drawBond(self, pos1, pos2):
+        x1, y1, z1 = pos1
+        x2, y2, z2 = pos2
+
+        X = np.array([x1, x2])
+        Y = np.array([y1, y2])
+        Z = np.array([z1, z2])
+
+        return (X, Y, Z)
 
     def generate3dMolecule(self, molecule):
         data = []
@@ -231,6 +243,7 @@ class Ui_QuantumSimulationGUI(object):
 
         maxRadius = max(radii)
 
+        #draw the atoms
         for i in range(len(symbols)):
             symbol = symbols[i]
             pos = positions[i]
@@ -240,12 +253,35 @@ class Ui_QuantumSimulationGUI(object):
             print(f"\t - {symbol}, position: ({x}, {y}, {z}), radius: {r}", flush=True)
 
             (x_pns_surface, y_pns_surface, z_pns_suraface) = self.drawSphere(pos, r)
-            data.append(go.Surface(x=x_pns_surface, y=y_pns_surface, z=z_pns_suraface, opacity=0.5))
+            data.append(go.Surface(x=x_pns_surface, y=y_pns_surface, z=z_pns_suraface, opacity=1.0))
 
-        #find the maxium atomic radius
-
-        print("\nGENERATING 3D MODEL---\n" + ('-' * 80), flush=True)
         fig = go.Figure(data=data)
+
+        #remove the color scale from the 3d model
+        fig.update_traces(showscale=False)
+
+        #draw the bonds between atoms
+        for i in range(1, len(symbols)):
+            pos1 = positions[i-1]
+            pos2 = positions[i]
+
+            x_bnd, y_bnd, z_bnd = self.drawBond(pos1, pos2)
+
+            fig.add_scatter3d(x=x_bnd, y=y_bnd, z=z_bnd, mode='lines', line_width=25, line_color='black')
+
+        print("\nGENERATING 3D MODEL...\n" + ('-' * 80), flush=True)
+
+        #remove the grid of the 3d model
+        fig.update_layout(
+            scene = dict(
+                xaxis = dict(visible=False),
+                yaxis = dict(visible=False),
+                zaxis = dict(visible=False)
+            ),
+
+            showlegend=False
+        )
+
         fig.show()
 
     def parseLine(self, line):
