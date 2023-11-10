@@ -86,8 +86,8 @@ class GraphWindow(QWidget):
             betas = params[1]
             neg_obj = 0.0
             for edge in self.matrix:
-                neg_obj -= 0.5 * (1.0 - float(self.circuit(gammas, betas, edge=edge, n_layers=n_layers)))
-            return float(neg_obj)
+                neg_obj -= 0.5 * (1.0 - self.circuit(gammas, betas, edge=edge, n_layers=n_layers))
+            return neg_obj
 
         opt = qml.AdagradOptimizer(stepsize=0.5)
         params = init_params
