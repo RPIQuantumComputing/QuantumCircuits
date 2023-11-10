@@ -9,7 +9,16 @@ from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLineEdit, QPush
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
 import os
-os.environ["DWAVE_API_TOKEN"] = "DEV-648f4916bfa0706429cbdd64b5e08c4847f505bd"
+import tkinter as tk
+from tkinter import simpledialog
+
+def get_api_key():
+    root = tk.Tk()
+    root.withdraw()  # Hide the main window
+    api_key = simpledialog.askstring("API Key Request", "Please enter your API key:")
+    return api_key
+    
+os.environ["DWAVE_API_TOKEN"] = get_api_key()
 
 def sample_and_plot(qubo_matrix, graph_window):
     # Convert QUBO matrix to a dimod BQM (Binary Quadratic Model)
