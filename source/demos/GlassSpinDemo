@@ -31,7 +31,7 @@ def sample_and_plot(qubo_matrix, graph_window):
     client = dwave.cloud.Client.from_config()
     solver = client.get_solver(qpu=True)
 
-    sampler = EmbeddingComposite(DWaveSampler(token="DEV-648f4916bfa0706429cbdd64b5e08c4847f505bd"))
+    sampler = EmbeddingComposite(DWaveSampler(token=os.environ["DWAVE_API_TOKEN"]))
     sampleset = sampler.sample(bqm, num_reads=256, chain_strength=1, label='bqm/sampleset inspector example')
 
     energies = [sample.energy for sample in sampleset.data()]
