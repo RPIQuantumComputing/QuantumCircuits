@@ -261,6 +261,12 @@ def changeGateError(checked):
 def changeReadoutError(checked):
     designer.settings.readout_error = checked
     print("Set readout error to " + str(checked))
+def changeIsNoiseEnabled(checked):
+    designer.settings.isNoiseEnabled = checked
+    print("Set isNoiseEnabled to " + str(checked))
+def updateShots(val):
+    designer.settings.shots = val
+    print("Set shots to " + str(val))
 def changeMeasurement(checked):
     designer.settings.measurement = checked
     print("Set measurement to " + str(checked))
@@ -863,11 +869,13 @@ class Window(QMainWindow):
         #create simulation settings layout and running layout
         self.createSimulationSetting()
         self.createSimulationRunning()
+        self.createNoiseSettings()
 
         #right side toolbar to hold simulation settings
         setting = QToolBar()
         setting.addWidget(self.SimulationChoice)
         setting.addWidget(self.SimulationSetting)
+        setting.addWidget(self.NoiseSettings)
         self.addToolBar(Qt.RightToolBarArea, setting)
 
         #display grid as central widget
@@ -1015,16 +1023,6 @@ class Window(QMainWindow):
         self.SimulationSetting = QGroupBox("Simulation Setting")
 
         layout = QVBoxLayout()
-
-        gate_error = QCheckBox("Gate Error")
-        gate_error.toggled.connect(self.TypeOnClicked)
-        gate_error.callsign = "gate_error"
-        layout.addWidget(gate_error)
-
-        readout_error = QCheckBox("Readout Error")
-        readout_error.toggled.connect(self.TypeOnClicked)
-        readout_error.callsign = "readout_error"
-        layout.addWidget(readout_error)
         
         #check box for measurement, setting will be updated once toggled
         measurement = QCheckBox("Measurement")
@@ -1056,28 +1054,11 @@ class Window(QMainWindow):
         layout.addWidget(photonicMode)
         photonicMode.callsign = "photonic"
 
-        # Various other field boxes, obvious based on titling
-        noice_label = QLabel("Noice Model")
-        noice_selection = ["none", "other..."]
-        noice_box = QComboBox()
-        noice_box.addItems(noice_selection)
-        layout.addWidget(noice_label)
-        layout.addWidget(noice_box)
-
         optimization_label = QLabel("Optimization")
         optimization_selection = ["none", "other..."]
         optimization_box = QComboBox()
         optimization_box.addItems(optimization_selection)
-        
-        
-        temperature = QSpinBox(self.SimulationSetting)
-        temperature.setValue(0)
-        temperature.callsign = "temperature"
-        temperature.setMinimum(0)
-        temperature.setMaximum(2147483647)
-        temperature_label = QLabel("Temperature (mK): ")
-        temperature.valueChanged.connect(self.UpdateParameters)
-        
+                
         num_qubits = QSpinBox(self.SimulationSetting)
         num_qubits.setValue(5)
         num_qubits.callsign = "numqubit"
@@ -1117,8 +1098,6 @@ class Window(QMainWindow):
         width_label.setBuddy(num_width)
         layout.addWidget(optimization_label)
         layout.addWidget(optimization_box)
-        layout.addWidget(temperature_label)
-        layout.addWidget(temperature)
         layout.addWidget(qubit_label)
         layout.addWidget(num_qubits)
         layout.addWidget(width_label)
@@ -1127,14 +1106,59 @@ class Window(QMainWindow):
         layout.addStretch(1)
         self.SimulationSetting.setLayout(layout)
 
+    def createNoiseSettings(self):
+        self.NoiseSettings = QGroupBox("Noise Settings")
+
+        layout = QVBoxLayout()
+
+        is_noise_enabled = QCheckBox("Enable Noise")
+        is_noise_enabled.toggled.connect(self.TypeOnClicked)
+        is_noise_enabled.callsign = "is_noise_enabled"
+        layout.addWidget(is_noise_enabled)
+        
+        gate_error = QCheckBox("Gate Error")
+        gate_error.toggled.connect(self.TypeOnClicked)
+        gate_error.callsign = "gate_error"
+        layout.addWidget(gate_error)
+
+        readout_error = QCheckBox("Readout Error")
+        readout_error.toggled.connect(self.TypeOnClicked)
+        readout_error.callsign = "readout_error"
+        layout.addWidget(readout_error)
+
+        temperature = QSpinBox(self.NoiseSettings)
+        temperature.setValue(0)
+        temperature.callsign = "temperature"
+        temperature.setMinimum(0)
+        temperature.setMaximum(2147483647)
+        temperature_label = QLabel("Temperature (mK): ")
+        temperature.valueChanged.connect(self.UpdateParameters)
+        layout.addWidget(temperature_label)
+        layout.addWidget(temperature)
+
+        shots = QSpinBox(self.NoiseSettings)
+        shots.callsign = "shots"
+        shots.setMinimum(1)
+        shots.setMaximum(2147483647)
+        shots.setValue(1024)
+        shots_label = QLabel("Shots: ")
+        shots.valueChanged.connect(self.UpdateParameters)
+        layout.addWidget(shots_label)
+        layout.addWidget(shots)
+        
+        layout.addStretch(1)
+        self.NoiseSettings.setLayout(layout)
+    
     #integration function that connects checkboxs on gui to backend
     def TypeOnClicked(self):
         Button = self.sender()
         designer.settings.measurement = Button.isChecked()
         if (Button.callsign == "gate_error"):
             changeGateError(Button.isChecked())
-        if (Button.callsign == "readout_error"):
+        elif (Button.callsign == "readout_error"):
             changeReadoutError(Button.isChecked())
+        elif (Button.callsign == "is_noise_enabled"):
+            changeIsNoiseEnabled(Button.isChecked())
         elif (Button.callsign == "measurement"):
             changeMeasurement(Button.isChecked())
         elif (Button.callsign == "suggestion"):
@@ -1170,7 +1194,8 @@ class Window(QMainWindow):
             forceUpdate()
         elif (spin.callsign == "temperature"):
             updateTemperature(val)
-            #forceUpdate()
+        elif (spin.callsign == "shots"):
+            updateShots(val)
 
     def makeCustomGate(self):
         x1 = QtWidgets.QInputDialog.getInt(self, 'X1', 'Input:')

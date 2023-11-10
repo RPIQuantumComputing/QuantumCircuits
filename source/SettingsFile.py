@@ -4,7 +4,8 @@ class Settings:
     backend = "HamiltionSimulation"
     num_qubits = 5
     num_width = 8
-    shots = -1
+    isNoiseEnabled = False
+    shots = 1024
     measurement = False
     gate_error = False
     readout_error = False

@@ -133,7 +133,6 @@ class Designer:
 
     # Specify simulation settings, send grid information, run simulation, and get results
     def runSimulation(self):
-        self.settings.shots = 256
         print(self.settings.specialGridSettings)
         simulation = SimulationFile.Simulation(self.settings)
         simulation.sendStateInfo(self.gridWidth, self.gridHeight, self.grid)

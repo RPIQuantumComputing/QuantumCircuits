@@ -60,15 +60,6 @@ class HamiltonionBackend:
         numDepth = gridWidth
         # Make qiskit gate
         circuit = QuantumCircuit(numQubits)
-        device_backend = FakeVigo()
-        #coupling_map = device_backend.configuration().coupling_map
-        isNoise = self.settings.gate_error or self.settings.readout_error or (self.settings.temperature != 0)
-        noise_model = NoiseModel.from_backend(device_backend,
-                                              gate_error=self.settings.gate_error,
-                                              readout_error=self.settings.readout_error,
-                                              thermal_relaxation=self.settings.temperature != 0,
-                                              temperature=self.settings.temperature)
-        print(noise_model)
         for widthIdx in range(gridWidth):
             circuitLayer = []
             for heightIdx in range(gridHeight):
@@ -151,13 +142,24 @@ class HamiltonionBackend:
             )
         )
 
-        if (isNoise):
+        if (self.settings.isNoiseEnabled):
+            device_backend = FakeVigo()
+            #coupling_map = device_backend.configuration().coupling_map
+            noise_model = NoiseModel.from_backend(device_backend,
+                                              gate_error=self.settings.gate_error,
+                                              readout_error=self.settings.readout_error,
+                                              thermal_relaxation=self.settings.temperature != 0,
+                                              temperature=self.settings.temperature)
+            print(noise_model)
+            
             # Noise model measuring
             circuit.measure_all()
             #simulator = Aer.get_backend('aer_simulator')
             #basis_gates = noise_model.basis_gates
-            result_noise = execute(circuit, simulator, noise_model=noise_model).result()
+            result_noise = execute(circuit, simulator, noise_model=noise_model, shots=self.settings.shots).result()
             counts_noise = result_noise.get_counts(circuit)
+
+            # make plot
             keys = list(map(lambda x: x, counts_noise))
             values = list(map(lambda x: counts_noise[x], keys))
             bars = plt.bar(keys, values, width = 0.4)
