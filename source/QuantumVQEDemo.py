@@ -1,4 +1,8 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
+
+from PyQt5 import QtWebEngineWidgets
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+
 from pyscf import gto, scf
 import sys
 from typing import Any
@@ -116,6 +120,7 @@ class RunAlgorithm:
 
 # The simulation method heavily uses https://quri-parts.qunasys.com/tutorials/quantum_chemistry/mo_eint_and_hamiltonial's
 # Example code
+
 class Ui_QuantumSimulationGUI(object):
     user_mol = None
     user_mo_coeff=None
@@ -131,22 +136,23 @@ class Ui_QuantumSimulationGUI(object):
 
         self.textEdit = QtWidgets.QTextEdit()
         left_layout.addWidget(self.textEdit)
-        self.textEdit.setHtml(QtCore.QCoreApplication.translate(
-            "QuantumSimulationGUI", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
-            "<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
-            "p, li { white-space: pre-wrap; }\n"
-            "</style></head><body style=\" font-family:\'MS Shell Dlg 2\'; font-size:8.1pt; font-weight:400; font-style:normal;\">\n"
-            "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">\'\'\'</p>\n"
-            "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">H (0,0,0)</p>\n"
-            "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">O (2,0,1)</p>\n"
-            "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">H (0,0,2)</p>\n"
-            "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">\'\'\'</p></body></html>"))
+
+        # self.textEdit.setHtml(QtCore.QCoreApplication.translate(
+        #     "QuantumSimulationGUI", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
+        #     "<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
+        #     "p, li { white-space: pre-wrap; }\n"
+        #     "</style></head><body style=\" font-family:\'MS Shell Dlg 2\'; font-size:8.1pt; font-weight:400; font-style:normal;\">\n"
+        #     "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">\'\'\'</p>\n"
+        #     "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">H (0,0,0)</p>\n"
+        #     "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">O (2,0,1)</p>\n"
+        #     "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">H (0,0,2)</p>\n"
+        #     "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">\'\'\'</p></body></html>"))
 
         self.pushButton = QtWidgets.QPushButton("Compute Electronic Integrals")
         self.pushButton.clicked.connect(self.on_compute_integrals_clicked)
         left_layout.addWidget(self.pushButton)
 
-
+        #load widgets for specifying orbitals and electrons
         self.label_3 = QtWidgets.QLabel("Step 2: Specify the number of orbitals and electrons")
         left_layout.addWidget(self.label_3)
 
@@ -158,20 +164,31 @@ class Ui_QuantumSimulationGUI(object):
 
         # Right side layout
         right_layout = QtWidgets.QVBoxLayout()
-
-        # Label for the ComboBox
-        self.mappingLabel = QtWidgets.QLabel("Select Mapping:")
-        self.mappingLabel.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
-        right_layout.addWidget(self.mappingLabel)
+        right_layout.setSpacing(0)
 
         # ComboBox for mapping selection
+        mappings = ["SELECT MAPPING", "Jordan-Wigner", "Bravyi-Kitaev", "Symmetric Bravyi-Kitaev"]
         self.mappingComboBox = QtWidgets.QComboBox()
-        self.mappingComboBox.addItem("Jordan-Wigner")
-        self.mappingComboBox.addItem("Bravyi-Kitaev")
-        self.mappingComboBox.addItem("Symmetric Bravyi-Kitaev")
+
+        self.mappingComboBox.addItems(mappings)
+        self.mappingComboBox.setCurrentIndex(0)  #intialize the default to the first mapping
         self.mappingComboBox.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+
         right_layout.addWidget(self.mappingComboBox)
 
+        # ComboxBox for preset molecules
+        presets = ["OPTIONAL PRESET", "Water", "Calcium Oxide", "Ozone", "Sodium Chloride", "Carbon Dioxide"]
+        self.presetComboBox = QtWidgets.QComboBox()
+
+        self.presetComboBox.currentIndexChanged.connect(self.on_preset_select)
+
+        self.presetComboBox.addItems(presets)
+        self.presetComboBox.setCurrentIndex(0)  #intialize the default to the first preset
+        self.presetComboBox.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+
+        right_layout.addWidget(self.presetComboBox)
+
+        #initialize the simulate button
         self.Simulate = QtWidgets.QPushButton("Simulate")
         right_layout.addWidget(self.Simulate)
         self.Simulate.clicked.connect(self.on_simulate_clicked)
@@ -180,6 +197,10 @@ class Ui_QuantumSimulationGUI(object):
         main_layout = QtWidgets.QHBoxLayout()
         main_layout.addLayout(left_layout)
         main_layout.addLayout(right_layout)
+
+        # Add the ploly graph to the interface
+        self.render = QWebEngineView()
+        right_layout.addWidget(self.render)
 
         self.centralwidget.setLayout(main_layout)
         QuantumSimulationGUI.setCentralWidget(self.centralwidget)
@@ -253,7 +274,11 @@ class Ui_QuantumSimulationGUI(object):
             print(f"\t - {symbol}, position: ({x}, {y}, {z}), radius: {r}", flush=True)
 
             (x_pns_surface, y_pns_surface, z_pns_suraface) = self.drawSphere(pos, r)
-            data.append(go.Surface(x=x_pns_surface, y=y_pns_surface, z=z_pns_suraface, opacity=1.0))
+            data.append(go.Surface(x=x_pns_surface, 
+                                   y=y_pns_surface, 
+                                   z=z_pns_suraface, 
+                                   opacity=1.0,
+                                   colorscale = 'reds'))
 
         fig = go.Figure(data=data)
 
@@ -281,6 +306,9 @@ class Ui_QuantumSimulationGUI(object):
 
             showlegend=False
         )
+
+        html_content = fig.to_html(full_html=False)
+        self.render.setHtml(html_content)
 
         fig.show()
 
@@ -328,6 +356,7 @@ class Ui_QuantumSimulationGUI(object):
             self.full_space, self.mo_eint_set = get_spin_mo_integrals_from_mole(self.user_mol, self.user_mo_coeff)
         except:
             print("Error: Material is not physically stable!")
+
     def on_simulate_clicked(self):
         try:
             # Compute the Active Space
@@ -346,6 +375,7 @@ class Ui_QuantumSimulationGUI(object):
             # Let us perform the simulation!
             algo_run = RunAlgorithm()
             print("Final Energy Estimate: ", algo_run.get_result(active_space_jw_hamiltonian, self.number_of_electrons, self.number_of_orbitals))
+
             global costs
             plt.plot(costs)
             plt.xlabel("Iteration of VQE")
@@ -353,6 +383,24 @@ class Ui_QuantumSimulationGUI(object):
             plt.show()
         except:
             print("Error: Invalid Electron/Orbital Configuration or Structure!")
+
+    def on_preset_select(self):
+        
+        presets = [
+            "DEFAULT", 
+            "H (0,0,0)\nO (2,0,1)\nH (0,0,2)", # Water
+            "Ca (0,0,0)\nO (0,0,1)",            # Calcium Oxide
+            "O (0,0,0)\nO (2,0,1)\nH (0,0,2)", # Ozone
+            "Na (0,0,0)\nO (0,0,1)",            # Sodium Chloride
+            "O (0,0,0)\nC (2,0,1)\nO (0,0,2)"  # Carbon Dioxide
+        ]
+
+        selected_index = self.presetComboBox.currentIndex()
+        selected_preset = presets[selected_index]
+
+        self.textEdit.setPlainText(selected_preset)
+
+        #load the preset into the box 
 
 if __name__ == "__main__":
     import sys
