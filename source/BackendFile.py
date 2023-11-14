@@ -30,7 +30,8 @@ from qiskit.tools.visualization import plot_histogram, plot_state_city
 from qiskit_aer.library.save_instructions import save_statevector
 import qiskit.quantum_info as qi
 from qiskit_aer.noise import NoiseModel
-from qiskit.test.mock import FakeVigo
+from qiskit.test.mock import FakeToronto, FakeVigo
+from qiskit_aer import AerSimulator
 
 class HamiltonionBackend:
     provider = "Local"
@@ -108,69 +109,58 @@ class HamiltonionBackend:
         
         # Save results
         simulator = Aer.get_backend('aer_simulator')
-        circ = transpile(circuit, simulator)
-        
-        # Run and get statevector
-        result = simulator.run(circ).result()
-        sv = result.get_statevector(circ)
-        sv = np.array(sv)
-        results = getAllPossibilities(sv, numQubits)
-        self.result = result
-        fig = plt.figure(figsize = (20, 5))
-        xVal = []
-        yVal = []
-        norm = mpl.colors.Normalize(vmin=0, vmax=np.pi)
-        cmap = cm.hsv
-        m = cm.ScalarMappable(norm=norm, cmap=cmap)
-        # Normalize to 100% (show percentages, not decimals)
-        for entry in results:
-            xVal.append(entry[0][::-1])
-            if(hasCupy):
-                yVal.append(entry[1].get()*100)
-            else:
-                yVal.append(entry[1]*100)
-        if(hasCupy):
-            phases = [m.to_rgba(tnp.angle(results[j][2].get() * 1j)) for j in range(len(results))]
-        else:
-            phases = [m.to_rgba(tnp.angle(results[j][2] * 1j)) for j in range(len(results))]
-        # Values are not sorted, do your magic pandas!
-        df = pd.DataFrame(
-            dict(
-                x=xVal,
-                y=yVal,
-                phase=phases
-            )
-        )
-
         if (self.settings.isNoiseEnabled):
-            device_backend = FakeVigo()
-            #coupling_map = device_backend.configuration().coupling_map
-            noise_model = NoiseModel.from_backend(device_backend,
-                                              gate_error=self.settings.gate_error,
-                                              readout_error=self.settings.readout_error,
-                                              thermal_relaxation=self.settings.temperature != 0,
-                                              temperature=self.settings.temperature)
-            print(noise_model)
-            
-            # Noise model measuring
-            circuit.measure_all()
-            #simulator = Aer.get_backend('aer_simulator')
-            #basis_gates = noise_model.basis_gates
-            result_noise = execute(circuit, simulator, noise_model=noise_model, shots=self.settings.shots).result()
-            counts_noise = result_noise.get_counts(circuit)
-
-            # make plot
-            keys = list(map(lambda x: x, counts_noise))
-            values = list(map(lambda x: counts_noise[x], keys))
-            bars = plt.bar(keys, values, width = 0.4)
-            plt.title("Counts of Given Quantum Circuit")
+            device_backend = FakeToronto()
+            simulator = AerSimulator.from_backend(device_backend)
+        circ = transpile(circuit, simulator)
+        result = simulator.run(circ).result()
+        
+        if (self.settings.isNoiseEnabled):
+            counts_noise = result.get_counts(0)
+            keys = list(map(lambda x: x[::-1], counts_noise))
+            keys.sort()
+            values = list(map(lambda x: counts_noise[x[::-1]], keys))
+            fig = plt.figure(figsize = (20, 5))
+            bars = plt.bar(keys, values, width = 0.8)
+            plt.title("Frequency of Given Quantum Circuit")
             plt.xlabel("Computational Result")
-            plt.ylabel("Counts")
+            plt.ylabel("Frequency")
             plt.bar_label(bars)
             self.histogramResult = plt
-            self.results = results
-
+            self.results = result
+            
         else:
+            # Run and get statevector
+            #result = simulator.run(circ).result()
+            sv = result.get_statevector(circ)
+            sv = np.array(sv)
+            results = getAllPossibilities(sv, numQubits)
+            fig = plt.figure(figsize = (20, 5))
+            xVal = []
+            yVal = []
+            norm = mpl.colors.Normalize(vmin=0, vmax=np.pi)
+            cmap = cm.hsv
+            m = cm.ScalarMappable(norm=norm, cmap=cmap)
+            # Normalize to 100% (show percentages, not decimals)
+            for entry in results:
+                xVal.append(entry[0][::-1])
+                if(hasCupy):
+                    yVal.append(entry[1].get()*100)
+                else:
+                    yVal.append(entry[1]*100)
+            if(hasCupy):
+                phases = [m.to_rgba(tnp.angle(results[j][2].get() * 1j)) for j in range(len(results))]
+            else:
+                phases = [m.to_rgba(tnp.angle(results[j][2] * 1j)) for j in range(len(results))]
+            # Values are not sorted, do your magic pandas!
+            df = pd.DataFrame(
+                dict(
+                    x=xVal,
+                    y=yVal,
+                    phase=phases
+                )
+            )
+    
             df_sorted = df.sort_values('x')
             # Make graph
             plt.bar(df_sorted['x'], df_sorted['y'], width = 0.4, color = df_sorted['phase'])
@@ -622,44 +612,74 @@ class QiskitBackend:
                         circuit.cnot(heightIdx, heightIdx + 1)
                         heightIdx += 1
         circuit.measure_all()
-        # This time, use the QaSM provider
-        from qiskit import IBMQ
-        from qiskit.compiler import transpile, assemble
-        IBMQ.save_account(self.API_KEY, overwrite=True)
-        provider = IBMQ.load_account()
-        backend = provider.get_backend('ibmq_qasm_simulator')
-        transpiled = transpile(circuit, backend=backend)
-        qobj = assemble(transpiled, backend=backend, shots=1024)
-        job = backend.run(qobj)
-        print(job.status()) # Tell the user results are pending
-        # Produce results
-        self.results = job.result().get_counts(circuit)
-        fig = plt.figure(figsize = (20, 5))
-        xVal = []
-        yVal = []
-        total = 0
-        for _, y in self.results.items():
-            total += y
-        for a, b in self.results.items():
-            xVal.append(a)
-            yVal.append((b / total) * 100)
 
-        df = pd.DataFrame(
-            dict(
-                x=xVal,
-                y=yVal
+        if (self.settings.isNoiseEnabled):
+            device_backend = FakeVigo()
+            #coupling_map = device_backend.configuration().coupling_map
+            noise_model = NoiseModel.from_backend(device_backend,
+                                              gate_error=self.settings.gate_error,
+                                              readout_error=self.settings.readout_error,
+                                              thermal_relaxation=self.settings.temperature != 0,
+                                              temperature=self.settings.temperature)
+            print(noise_model)
+            
+            # Noise model measuring
+            simulator = Aer.get_backend('aer_simulator')
+            #basis_gates = noise_model.basis_gates
+            result_noise = execute(circuit, simulator, noise_model=noise_model, shots=self.settings.shots).result()
+            counts_noise = result_noise.get_counts(circuit)
+
+            # make plot
+            keys = list(map(lambda x: x[::-1], counts_noise))
+            keys.sort()
+            values = list(map(lambda x: counts_noise[x[::-1]], keys))
+            fig = plt.figure(figsize = (20, 5))
+            bars = plt.bar(keys, values, width = 0.8)
+            plt.title("Counts of Given Quantum Circuit")
+            plt.xlabel("Computational Result")
+            plt.ylabel("Counts")
+            plt.bar_label(bars)
+            self.histogramResult = plt
+            self.results = result_noise
+        else:
+            # This time, use the QaSM provider
+            from qiskit import IBMQ
+            from qiskit.compiler import transpile, assemble
+            IBMQ.save_account(self.API_KEY, overwrite=True)
+            provider = IBMQ.load_account()
+            backend = provider.get_backend('ibmq_qasm_simulator')
+            transpiled = transpile(circuit, backend=backend)
+            qobj = assemble(transpiled, backend=backend, shots=1024)
+            job = backend.run(qobj)
+            print(job.status()) # Tell the user results are pending
+            # Produce results
+            self.results = job.result().get_counts(circuit)
+            fig = plt.figure(figsize = (20, 5))
+            xVal = []
+            yVal = []
+            total = 0
+            for _, y in self.results.items():
+                total += y
+            for a, b in self.results.items():
+                xVal.append(a)
+                yVal.append((b / total) * 100)
+
+            df = pd.DataFrame(
+                dict(
+                    x=xVal,
+                    y=yVal
+                )
             )
-        )
 
-        df_sorted = df.sort_values('x')
-        plt.bar(df_sorted['x'], df_sorted['y'], width = 0.4)
-        plt.xlabel("Computational Result")
-        plt.ylabel("Probability")
-        rotationAmount = math.floor(90/(1 + np.exp(-(((len(xVal))/3)-5))))
-        plt.xticks(rotation = rotationAmount)
-        plt.title("Probability Distribution of Given Quantum Circuit")
-        self.histogramResult = plt
-        print(self.results)
+            df_sorted = df.sort_values('x')
+            plt.bar(df_sorted['x'], df_sorted['y'], width = 0.4)
+            plt.xlabel("Computational Result")
+            plt.ylabel("Probability")
+            rotationAmount = math.floor(90/(1 + np.exp(-(((len(xVal))/3)-5))))
+            plt.xticks(rotation = rotationAmount)
+            plt.title("Probability Distribution of Given Quantum Circuit")
+            self.histogramResult = plt
+            print(self.results)
 
 # Backend factor to create gates
 def BackendFactory(backendType="HamiltionSimulation", settings=SettingsFile.Settings()):
