@@ -1,0 +1,170 @@
+import sys
+import networkx as nx
+import matplotlib.pyplot as plt
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLineEdit, QPushButton, QHBoxLayout, QLabel
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+import pennylane as qml
+from pennylane import numpy as np
+import os
+
+n_wires = 0
+graph = []
+dev = None
+
+def initialize_device():
+    global dev
+    global n_wires
+    dev = qml.device("default.qubit", wires=n_wires, shots=1)
+
+def U_B(beta):
+    global n_wires
+    for wire in range(n_wires):
+        qml.RX(2 * beta, wires=wire)
+
+def U_C(gamma):
+    global graph
+    for edge in graph:
+        wire1 = edge[0]
+        wire2 = edge[1]
+        qml.CNOT(wires=[wire1, wire2])
+        qml.RZ(gamma, wires=wire2)
+        qml.CNOT(wires=[wire1, wire2])
+
+def create_circuit():
+    @qml.qnode(dev)
+    def circuit(gammas, betas, edge=None, n_layers=1):
+        for wire in range(n_wires):
+            qml.Hadamard(wires=wire)
+        for i in range(n_layers):
+            U_C(gammas[i])
+            U_B(betas[i])
+        if edge is None:
+            return qml.sample()
+        H = qml.PauliZ(edge[0]) @ qml.PauliZ(edge[1])
+        return qml.expval(H)
+    return circuit
+
+def bitstring_to_int(bit_string_sample):
+    bit_string = "".join(str(bs) for bs in bit_string_sample)
+    return int(bit_string, base=2)
+
+class GraphWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.edges = []
+        self.matrix = []
+        self.fig, self.ax = plt.subplots(figsize=(9, 6))
+        self.ax.axis('on')
+        self.ax.set_aspect('equal', 'box')
+        self.canvas = FigureCanvas(self.fig)
+        self.canvas.mpl_connect('button_press_event', self.on_click)
+
+        self.nodes = []
+        self.selected_node = None
+        layout = QVBoxLayout()
+
+        canvas_box = QHBoxLayout()
+        canvas_box.addWidget(self.canvas)
+        layout.addLayout(canvas_box)
+
+        button_box = QHBoxLayout()
+        self.simulate_btn = QPushButton("Simulate", self)
+        button_box.addStretch(1)
+        button_box.addWidget(self.simulate_btn)
+        button_box.addStretch(1)
+        self.simulate_btn.clicked.connect(self.simulate)
+        layout.addLayout(button_box)
+
+        self.setLayout(layout)
+
+    def qaoa_maxcut(self, n_layers=1):
+        print("\np={:d}".format(n_layers))
+        init_params = 0.01 * np.random.rand(2, n_layers, requires_grad=True)
+
+        def objective(params):
+            gammas = params[0]
+            betas = params[1]
+            neg_obj = 0.0
+            for edge in self.matrix:
+                neg_obj -= 0.5 * (1.0 - self.circuit(gammas, betas, edge=edge, n_layers=n_layers))
+            return neg_obj
+
+        opt = qml.AdagradOptimizer(stepsize=0.5)
+        params = init_params
+        steps = 30
+        for i in range(steps):
+            params = opt.step(objective, params)
+            if (i + 1) % 5 == 0:
+                print("Objective after step {:5d}: {: .7f}".format(i + 1, -objective(params)))
+
+        bit_strings = []
+        n_samples = 1024
+        for i in range(0, n_samples):
+            bit_strings.append(bitstring_to_int(self.circuit(params[0], params[1], edge=None, n_layers=n_layers)))
+
+        counts = np.bincount(np.array(bit_strings))
+        most_freq_bit_string = np.argmax(counts)
+        print("Optimized (gamma, beta) vectors:\n{}".format(params[:, :n_layers]))
+        print("Most frequently sampled bit string is: {:04b}".format(most_freq_bit_string))
+
+        return -objective(params), bit_strings
+    
+    def simulate(self):
+        global n_wires
+        global dev
+        global matrix
+        matrix = self.matrix
+        initialize_device()
+        self.circuit = create_circuit()
+        bitstrings = self.qaoa_maxcut(n_layers=3)[1]
+
+        xticks = range(0, n_wires**2)
+        xtick_labels = list(map(lambda x: format(x, "04b"), xticks))
+        bins = np.arange(0, n_wires**2 + 1) - 0.5; fig = plt.figure(1)
+        plt.title("QAOA Solutions Result Histogram")
+        plt.xlabel("Bitstring")
+        plt.ylabel("Frequency")
+        plt.xticks(xticks, xtick_labels, rotation="vertical")
+        plt.hist(bitstrings, bins=bins)
+        plt.tight_layout()
+        plt.show()
+
+    def to_adjacency_matrix(self):
+        global n_wires
+        n_wires = len(self.nodes)
+        for i, j, distance in self.edges:
+            self.matrix.append((i, j))
+
+    def on_click(self, event):
+        x, y = event.xdata, event.ydata
+        if x is None or y is None:
+            return
+
+        clicked_node = None
+        for idx, (nx, ny) in enumerate(self.nodes):
+            if (x - nx)**2 + (y - ny)**2 < 0.05**2:
+                clicked_node = idx
+                break
+
+        if clicked_node is not None:
+            if self.selected_node is not None and self.selected_node != clicked_node:
+                self.ax.plot([self.nodes[self.selected_node][0], self.nodes[clicked_node][0]], [self.nodes[self.selected_node][1], self.nodes[clicked_node][1]], color='black')
+                distance = ((self.nodes[self.selected_node][0] - self.nodes[clicked_node][0])**2 + (self.nodes[self.selected_node][1] - self.nodes[clicked_node][1])**2)**0.5
+                self.edges.append((self.selected_node, clicked_node, distance))
+                self.edges.append((clicked_node, self.selected_node, distance))
+                self.selected_node = None
+            else:
+                self.selected_node = clicked_node
+        else:
+            self.nodes.append((x, y))
+            self.ax.add_patch(plt.Circle((x, y), radius=0.05, color='blue', transform=self.ax.transData))
+
+        self.to_adjacency_matrix()
+        self.canvas.draw()
+
+app = QApplication(sys.argv)
+window = GraphWindow()
+window.setWindowTitle("MaxCUT QAOA Demo GUI")
+window.resize(window.sizeHint())
+window.show()
+sys.exit(app.exec_())
