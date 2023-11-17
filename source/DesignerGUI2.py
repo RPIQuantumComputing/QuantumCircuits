@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QGridLayout, QVBoxLayout, QSplitter, QMessageBox
 from PyQt5.QtCore import Qt, QMimeData, QPoint
 from PyQt5.QtGui import QDrag, QPainter, QPen
-from PyQt5.QtWidgets import QDialog, QFormLayout, QLineEdit, QDialogButtonBox, QMainWindow
+from PyQt5.QtWidgets import QDialog, QFormLayout, QLineEdit, QDialogButtonBox, QMainWindow, QMenu, QAction
 import sys
 
 class Overlay(QWidget):
@@ -322,6 +322,21 @@ class MainWindow(QMainWindow):
         super().__init__()        
         self.main_widget = MainWidget()  # Instantiate MainWidget
         self.setCentralWidget(self.main_widget)  # Set MainWidget as central widget
+
+        self.createTopMenu()
+
+    def createTopMenu(self):
+        menu = self.menuBar()
+        file_menu = QMenu("&File", self)
+        menu.addMenu(file_menu)
+        button_class = QMenu("&Class", self)
+        menu.addMenu(button_class)
+        button_learn = QMenu("&Learn", self)
+        menu.addMenu(button_learn)
+        button_dwave = QAction("&DWave", self)
+        menu.addAction(button_dwave)
+        button_custom_gate = QAction("&Custom Gate Creation", self)
+        menu.addAction(button_custom_gate)
     
 if __name__ == '__main__':
     app = QApplication(sys.argv)
