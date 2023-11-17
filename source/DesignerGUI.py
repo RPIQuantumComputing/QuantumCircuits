@@ -233,26 +233,33 @@ def runSimulation():
 def changeSimulationTechniqueHamiltonian():
     designer.setBackend("HamiltionSimulation")
     print("Changed backend to Hamiltion Simulation")
+    forceUpdate()
 def changeSimulationTechniqueHamiltonianCuQuantum():
     global cuQuantumTab
     cuQuantumTab.show()
     designer.setBackend("HamiltionSimulationCuQuantum")
     print("Changed backend to Hamiltion CuQuantum Simulation")
+    forceUpdate()
 def changeSimulationTechniqueFeynman():
     designer.setBackend("FeynmanSimulation")
     print("Changed backend to Feynman Simulation")
+    forceUpdate()
 def changeSimulationTechniqueDWave():
     designer.setBackend("DWaveSimulation")
     print("Changed backend to DWave Ocean")
+    forceUpdate()
 def changeSimulationTechniqueIBM():
     designer.setBackend("IBMSimulation")
     print("Changed backend to IBM Xanadu")
+    forceUpdate()
 def changeSimulationTechniqueQiskit():
     designer.setBackend("Qiskit")
     print("Changed to Qiskit Backend")
+    forceUpdate()
 def changeSimulationTechniqueXanadu():
     designer.setBackend("Photonic")
     print("Changed to Xanadu Photonic Backend")
+    forceUpdate()
 
 # Change Various settings based on click events, self-explanatory
 def changeGateError(checked):
@@ -1013,6 +1020,10 @@ class Window(QMainWindow):
                 self.external_sim_msg.exec()
             changeSimulationTechniqueIBM()
 
+    def updateFakeProvider(self, i):
+        designer.settings.fake_provider = self.fake_provider_box.currentText()
+        print("Set fake_provider to " + str( self.fake_provider_box.currentText() ))
+
     #a function that allows user to set external backend warning msg off
     def externalMsgToggle(self, pushed):
         if (pushed.text() == "Ignore"):
@@ -1114,17 +1125,14 @@ class Window(QMainWindow):
         is_noise_enabled = QCheckBox("Enable Noise")
         is_noise_enabled.toggled.connect(self.TypeOnClicked)
         is_noise_enabled.callsign = "is_noise_enabled"
-        layout.addWidget(is_noise_enabled)
-        
+
         gate_error = QCheckBox("Gate Error")
         gate_error.toggled.connect(self.TypeOnClicked)
         gate_error.callsign = "gate_error"
-        layout.addWidget(gate_error)
 
         readout_error = QCheckBox("Readout Error")
         readout_error.toggled.connect(self.TypeOnClicked)
         readout_error.callsign = "readout_error"
-        layout.addWidget(readout_error)
 
         temperature = QSpinBox(self.NoiseSettings)
         temperature.setValue(0)
@@ -1133,8 +1141,6 @@ class Window(QMainWindow):
         temperature.setMaximum(2147483647)
         temperature_label = QLabel("Temperature (mK): ")
         temperature.valueChanged.connect(self.UpdateParameters)
-        layout.addWidget(temperature_label)
-        layout.addWidget(temperature)
 
         shots = QSpinBox(self.NoiseSettings)
         shots.callsign = "shots"
@@ -1143,9 +1149,32 @@ class Window(QMainWindow):
         shots.setValue(1024)
         shots_label = QLabel("Shots: ")
         shots.valueChanged.connect(self.UpdateParameters)
-        layout.addWidget(shots_label)
-        layout.addWidget(shots)
-        
+
+        fake_provider_label = QLabel("Noise Model")
+        fake_provider_qubits = {"Toronto": 27, "Vigo": 5, "Almaden": 100, "Boeblingen": 100, "Brooklyn": 100, "Cairo": 27, 
+                                "Rueschlikon": 16, "Singapore": 100, "Nairobi": 7}
+        fake_provider_selection = []
+        for i in fake_provider_qubits.keys():
+            if fake_provider_qubits[i] >= currentHeight:
+                fake_provider_selection.append(i)
+        self.fake_provider_box = QComboBox()
+        self.fake_provider_box.addItems(fake_provider_selection)
+        self.fake_provider_box.currentIndexChanged.connect(self.updateFakeProvider)
+
+        if (designer.settings.backend == "HamiltionSimulation"):
+            layout.addWidget(is_noise_enabled)
+            layout.addWidget(fake_provider_label)
+            layout.addWidget(self.fake_provider_box)
+            
+        if (designer.settings.backend == "Qiskit"):
+            layout.addWidget(is_noise_enabled)
+            layout.addWidget(gate_error)
+            layout.addWidget(readout_error)
+            layout.addWidget(temperature_label)
+            layout.addWidget(temperature)
+            layout.addWidget(shots_label)
+            layout.addWidget(shots)
+            
         layout.addStretch(1)
         self.NoiseSettings.setLayout(layout)
     

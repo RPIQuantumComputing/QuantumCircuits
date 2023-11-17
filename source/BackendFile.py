@@ -27,10 +27,10 @@ from qiskit import QuantumCircuit
 from qiskit import IBMQ, Aer, transpile, execute
 import qiskit
 from qiskit.tools.visualization import plot_histogram, plot_state_city
-from qiskit_aer.library.save_instructions import save_statevector
+from qiskit_aer.library.save_instructions import save_statevector, 
 import qiskit.quantum_info as qi
 from qiskit_aer.noise import NoiseModel
-from qiskit.test.mock import FakeToronto, FakeVigo
+from qiskit.test.mock import FakeToronto, FakeVigo, FakeAlmaden, FakeBoeblingen, FakeBrooklyn, FakeCairo, FakeRueschlikon, FakeSingapore FakeNairobi
 from qiskit_aer import AerSimulator
 
 class HamiltonionBackend:
@@ -110,7 +110,8 @@ class HamiltonionBackend:
         # Save results
         simulator = Aer.get_backend('aer_simulator')
         if (self.settings.isNoiseEnabled):
-            device_backend = FakeToronto()
+            device_backend = getattr(qiskit.providers.fake_provider, "Fake" + self.settings.fake_provider)()
+            device_backend
             simulator = AerSimulator.from_backend(device_backend)
         circ = transpile(circuit, simulator)
         result = simulator.run(circ).result()

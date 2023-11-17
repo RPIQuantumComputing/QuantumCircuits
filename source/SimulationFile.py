@@ -29,7 +29,7 @@ class Simulation:
     # Runs simulation if results requested or obtains them from prior run
     def get_results(self, rerun=False):
         if(self.ranBefore == False or rerun == True):
-            self.backend.sendRequest(self.gridWidth, self.gridHeight, self.grid)
+            self.backend.sendRequest(self.settings.num_width, self.settings.num_qubits, self.grid)
             self.ranBefore = True
         if(self.backend != None):
             return self.backend.results

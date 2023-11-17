@@ -5,6 +5,7 @@ class Settings:
     num_qubits = 5
     num_width = 8
     isNoiseEnabled = False
+    fake_provider = "Toronto"
     shots = 1024
     measurement = False
     gate_error = False
