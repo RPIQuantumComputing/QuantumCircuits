@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QGridLayout, QVBoxLayout, QSplitter, QMessageBox
-from PyQt5.QtCore import Qt, QMimeData
+from PyQt5.QtCore import Qt, QMimeData, QPoint
 from PyQt5.QtGui import QDrag, QPainter, QPen
-from PyQt5.QtWidgets import QDialog, QFormLayout, QLineEdit, QDialogButtonBox
+from PyQt5.QtWidgets import QDialog, QFormLayout, QLineEdit, QDialogButtonBox, QMainWindow
 import sys
 
 class Overlay(QWidget):
@@ -316,9 +316,15 @@ class MainWidget(QWidget):
                 self.overlay.cnot_lines.append((QPoint(x, control_center_y), QPoint(x, target_center_y)))
 
         self.overlay.update()  # Trigger a repaint of the overlay
-        
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()        
+        self.main_widget = MainWidget()  # Instantiate MainWidget
+        self.setCentralWidget(self.main_widget)  # Set MainWidget as central widget
+    
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    main_widget = MainWidget()
-    main_widget.show()
+    window = MainWindow()
+    window.show()
     sys.exit(app.exec_())
