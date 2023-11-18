@@ -399,18 +399,26 @@ class Ui_QuantumSimulationGUI(object):
     def on_preset_select(self):
         
         presets = [
-            "DEFAULT", 
-            "H (0,0,0)\nO (2,0,1)\nH (0,0,2)", # Water
-            "Ca (0,0,0)\nO (0,0,1)",            # Calcium Oxide
-            "O (0,0,0)\nO (2,0,1)\nH (0,0,2)", # Ozone
-            "Na (0,0,0)\nO (0,0,1)",            # Sodium Chloride
-            "O (0,0,0)\nC (2,0,1)\nO (0,0,2)"  # Carbon Dioxide
+            ("DEFAULT", -1, -1), 
+            ("H (0,0,0)\nO (2,0,1)\nH (0,0,2)", 4, 6), # Water
+            ("Ca (0,0,0)\nO (0,0,1)", 4, 6),            # Calcium Oxide
+            ("O (0,0,0)\nO (2,0,1)\nH (0,0,2)", 4, 6), # Ozone
+            ("Na (0,0,0)\nO (0,0,1)", 4, 6),            # Sodium Chloride
+            ("O (0,0,0)\nC (2,0,1)\nO (0,0,2)", 4, 6)  # Carbon Dioxide
         ]
 
         selected_index = self.presetComboBox.currentIndex()
         selected_preset = presets[selected_index]
 
-        self.textEdit.setPlainText(selected_preset)
+        (molecule, orbitals, electrons) = selected_preset
+
+        self.textEdit.setPlainText(molecule)
+
+        self.spinBox.setValue(4) 
+        self.spinBox_2.setValue(6) 
+
+        self.spinBox.setValue(orbitals)
+        self.spinBox_2.setValue(electrons)
 
         #load the preset into the box 
 
