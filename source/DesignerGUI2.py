@@ -1,22 +1,30 @@
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QGridLayout, QVBoxLayout, QSplitter, QMessageBox
 from PyQt5.QtCore import Qt, QMimeData, QPoint
+from PyQt5.QtGui import QPixmap
 from PyQt5.QtGui import QDrag, QPainter, QPen
-from PyQt5.QtWidgets import QDialog, QFormLayout, QLineEdit, QDialogButtonBox, QMainWindow, QMenu, QAction
+from PyQt5.QtWidgets import QDialog, QFormLayout, QLineEdit, QDialogButtonBox, QMainWindow
 import sys
 
 class Overlay(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
-        self.cnot_lines = []  # This will store tuples of QPoint for start and end points of lines
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         painter.setPen(QPen(Qt.black, 2, Qt.SolidLine))
 
-        for line in self.cnot_lines:
-            painter.drawLine(line[0], line[1])
+        # Iterate through connections for each gate type
+        for gate_type, connections in self.parent().multiqubit_gate_connections.items():
+            for connection in connections:
+                painter.drawLine(connection[0], connection[1])
+
+class QuantumGate:
+    def __init__(self, name, num_controls, num_targets):
+        self.name = name
+        self.num_controls = num_controls
+        self.num_targets = num_targets
 
 class GridSizeDialog(QDialog):
     def __init__(self, parent=None):
@@ -56,13 +64,53 @@ class DraggableLabel(QLabel):
         drag.exec_(Qt.CopyAction | Qt.MoveAction)
 
 class ControlledGateCell(QLabel):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, gate_name="", row=None, col=None):
         super().__init__(parent)
+        self.row = row  # Row position in the grid
+        self.col = col  # Column position in the grid
+        self.gate_name = gate_name  # Store the gate name
         self.is_control = False
         self.is_target = False
         self.is_line = False
         self.setAlignment(Qt.AlignCenter)
         self.setStyleSheet("border: 1px solid black; width: 40px; height: 40px;")
+
+        self.loadGateImage(gate_name)
+
+    def loadGateImage(self, gate_name):
+        if gate_name in ["H", "T", "S", "X", "Y", "Z"]:  # List all single qubit gates
+            pixmap = QPixmap(f"../assets/{gate_name}.png")  # Assuming images are in an 'images' folder
+            self.setPixmap(pixmap)
+
+    # Mouse press event for drag initiation
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.drag_start_position = event.pos()
+
+    def mouseMoveEvent(self, event):
+        if not (event.buttons() & Qt.LeftButton):
+            return
+        if (event.pos() - self.drag_start_position).manhattanLength() < QApplication.startDragDistance():
+            return
+
+        # Set the flag to indicate the widget is being dragged
+        self.is_being_dragged = True
+
+        drag = QDrag(self)
+        mimedata = QMimeData()
+        mimedata.setText(self.gate_name)  # Use the gate name for the drag data
+        drag.setMimeData(mimedata)
+
+        # Execute the drag operation and check the result
+        result = drag.exec_(Qt.CopyAction | Qt.MoveAction)
+
+        # Reset the flag after the drag operation is complete
+        self.is_being_dragged = False
+
+        # If the drag was successful (MoveAction), then you can handle any necessary cleanup here.
+        if result == Qt.MoveAction:
+            # Handle any cleanup if needed
+            pass
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -71,7 +119,7 @@ class ControlledGateCell(QLabel):
         painter.setPen(QPen(Qt.black, 2))
         rect = self.rect()
 
-        # Draw line as a vertical line if the cell is part of the connection
+        # Draw line if the cell is part of a connection
         if self.is_line:
             painter.setPen(QPen(Qt.black, 2, Qt.SolidLine))
             mid_point_x = rect.center().x()
@@ -88,6 +136,9 @@ class ControlledGateCell(QLabel):
             painter.drawLine(rect.topLeft(), rect.bottomRight())
             painter.drawLine(rect.topRight(), rect.bottomLeft())
 
+        # Draw the gate name
+        if self.gate_name in ["H", "T", "S", "X", "Y", "Z"]:
+            painter.drawText(rect, Qt.AlignCenter, self.gate_name)
 
 class DropArea(QLabel):
     def __init__(self, parent_widget, row, col):
@@ -110,16 +161,27 @@ class DropArea(QLabel):
             # Set the target
             self.parent_widget.place_cnot_gate(self.col, self.row)
 
-
     def dropEvent(self, event):
-        # Handle the drop event for CNOT and other gates
         gate_text = event.mimeData().text()
-        if gate_text == "CNOT":
-            self.parent_widget.place_cnot_gate(self.col, self.row)
-        else:
-            self.setText(gate_text)
-        event.acceptProposedAction()
+        source_widget = event.source()
 
+        if isinstance(source_widget, ControlledGateCell) and source_widget.gate_name == gate_text:
+            # Moving gate within the grid
+            self.parent_widget.move_gate_within_grid(source_widget, self.row, self.col)
+        elif gate_text in self.parent_widget.multiqubit_gates:
+            # Handle placing or moving multi-qubit gate
+            if self.parent_widget.active_gates.get(self.col):
+                # Add target/control to an existing multi-qubit gate
+                self.parent_widget.add_target_to_gate(self.col, self.row, self.parent_widget.multiqubit_gates[gate_text])
+            else:
+                # Place new multi-qubit gate
+                self.parent_widget.place_multiqubit_gate(gate_text, self.col, self.row)
+        elif gate_text in self.parent_widget.items:
+            # Place single qubit gate
+            self.parent_widget.place_single_qubit_gate(gate_text, self.row, self.col)
+        else:
+            QMessageBox.warning(self, 'Error', 'Invalid gate type.')
+        event.acceptProposedAction()
 
 class MainWidget(QWidget):
     def __init__(self):
@@ -129,8 +191,16 @@ class MainWidget(QWidget):
         self.cnot_started = False
         self.cnot_column = None
         self.control_row = None
-        self.cnot_positions = {}  # Keep track of all CNOT control and target positions by column
+        # Added multiqubit gate representation
+        self.multiqubit_gates = {
+            "CNOT": QuantumGate("CNOT", 1, 1),
+            "Toffoli": QuantumGate("Toffoli", 2, 1)
+            # Add more gates as needed
+        }
         self.gate_positions = []  # This will be a 2D list updated in setupGrid
+        self.multiqubit_gate_connections = {}
+        self.active_gates = {}  # Tracks active multiqubit gates
+
 
         # Set up the UI elements
         splitter = QSplitter(Qt.Horizontal)
@@ -138,23 +208,22 @@ class MainWidget(QWidget):
         self.grid_layout = QGridLayout()  # Initialize grid_layout here
 
         # Left Selection Area
-        self.items = ["H", "T", "S", "X", "Y", "Z", "CNOT"]
+        self.items = ["H", "T", "S", "X", "Y", "Z", "CNOT", "Toffoli"]
         for idx, item in enumerate(self.items):
             row, col = divmod(idx, 2)
             label = DraggableLabel(item)
             label.setStyleSheet("border: 1px solid black; padding: 10px;")
             self.left_selection_area.addWidget(label, row, col)
 
-        # Create the dialog to set the grid size
+        # Initialize overlay before calling setupGrid
+        self.overlay = Overlay(self)
+        self.overlay.resize(self.size())  # Make sure the overlay covers the entire grid
+
+        # Create and execute the dialog to set the grid size
         self.gridSizeDialog = GridSizeDialog(self)
         if self.gridSizeDialog.exec_():
             rows, cols = self.gridSizeDialog.getValues()
             self.setupGrid(rows, cols)
-
-       # After setting up the grid
-        self.overlay = Overlay(self)
-        self.overlay.resize(self.size())  # Make sure the overlay covers the entire grid
-        self.update_overlay()
 
         # Splitter setup
         left_widget = QWidget()
@@ -170,110 +239,152 @@ class MainWidget(QWidget):
         self.main_layout = QVBoxLayout()
         self.main_layout.addWidget(splitter)
         self.setLayout(self.main_layout)
+
+        # Show the maximized main widget
         self.showMaximized()
 
-    def place_cnot_gate(self, col, row):
-        existing_cnot = self.cnot_positions.get(col, {})
-        existing_control = existing_cnot.get('control')
-        existing_target = existing_cnot.get('target')
-        self.gate_positions[row][col] = "CNOT"  # Set control position
+    def move_gate_within_grid(self, source_widget, new_row, new_col):
+        if self.gate_positions[new_row][new_col] == "":
+            # Remove the gate from its original position
+            old_row, old_col = source_widget.row, source_widget.col
+            gate_name = source_widget.gate_name
+            self.gate_positions[old_row][old_col] = ""
+            self.grid_layout.removeWidget(source_widget)
+            source_widget.deleteLater()
 
-        # If there's an existing CNOT in this column, and we're within its control and target range, prevent placement
-        if existing_cnot and existing_target is not None:
-            if existing_control <= row <= existing_target or existing_target <= row <= existing_control:
-                QMessageBox.warning(self, 'Error', 'Cannot place a CNOT here.')
-                return
+            # Check if the gate is part of a multi-qubit gate
+            if gate_name in self.multiqubit_gates:
+                # Update active_gates dictionary with new positions
+                self.update_multiqubit_gate_positions(old_row, old_col, new_row, new_col, gate_name)
 
-        # If we haven't started a CNOT yet, place the control
-        if not self.cnot_started:
-            self.cnot_started = True
-            self.cnot_column = col
-            self.cnot_positions[col] = {'control': row, 'target': None}  # Initialize target as None
-            control_cell = ControlledGateCell()
+            # Place the gate in the new position
+            self.gate_positions[new_row][new_col] = gate_name
+            new_gate_cell = ControlledGateCell(self, gate_name, new_row, new_col)
+            self.grid_layout.addWidget(new_gate_cell, new_row, new_col)
+        else:
+            QMessageBox.warning(self, 'Error', 'Target cell is already occupied.')
+
+
+    def place_single_qubit_gate(self, gate_name, row, col):
+        # Check if the cell is already occupied
+        if self.gate_positions[row][col] != "":
+            QMessageBox.warning(self, 'Error', 'Cell already occupied.')
+            return
+
+        # Update the gate position in the grid
+        self.gate_positions[row][col] = gate_name
+
+        gate_cell = ControlledGateCell(self, gate_name, row, col)
+        self.grid_layout.addWidget(gate_cell, row, col)
+    
+    def place_multiqubit_gate(self, gate_name, col, row):
+        # Ensure single qubit gates are not overwritten
+        if self.gate_positions[row][col] != "":
+            QMessageBox.warning(self, 'Error', 'This cell is already occupied.')
+            return
+
+
+        gate = self.multiqubit_gates.get(gate_name)
+        if not gate:
+            QMessageBox.warning(self, 'Error', f'Unknown gate: {gate_name}')
+            return
+
+        # Check if a gate is already started in this column
+        if col in self.active_gates:
+            self.add_target_to_gate(col, row, gate)
+        else:
+            self.start_new_gate(col, row, gate)
+
+        # Set row and col for the newly placed gate
+        gate_widget = self.grid_layout.itemAtPosition(row, col).widget()
+        if gate_widget and isinstance(gate_widget, ControlledGateCell):
+            gate_widget.row = row
+            gate_widget.col = col
+
+        self.update_connections()
+
+    def start_new_gate(self, col, row, gate):
+        if gate.num_controls + gate.num_targets > 1:
+            # Start a new multiqubit gate
+            self.active_gates[col] = {'started': True, 'control': [row], 'target': [], 'type': gate.name}
+            control_cell = ControlledGateCell(self, gate.name, row, col)
             control_cell.is_control = True
             self.grid_layout.addWidget(control_cell, row, col)
         else:
-            # If we're finishing a CNOT, check that the column is the same and place the target
-            if col != self.cnot_column or row == existing_control:
-                QMessageBox.warning(self, 'Error', 'Target must be in the same column and different row as control.')
-                return
-            # Place the target
-            self.cnot_positions[col]['target'] = row
-            target_cell = ControlledGateCell()
+            # Handle single qubit gate here
+            pass
+
+    def add_target_to_gate(self, col, row, gate):
+        gate_info = self.active_gates[col]
+        if len(gate_info['control']) < gate.num_controls:
+            # Add another control
+            gate_info['control'].append(row)
+            control_cell = ControlledGateCell(self, gate.name, row, col)
+            control_cell.is_control = True
+            self.grid_layout.addWidget(control_cell, row, col)
+        elif len(gate_info['target']) < gate.num_targets:
+            # Add a target
+            gate_info['target'].append(row)
+            target_cell = ControlledGateCell(self, gate.name, row, col)
             target_cell.is_target = True
             self.grid_layout.addWidget(target_cell, row, col)
-            self.draw_connection(existing_control, row, col)
-            self.cnot_started = False  # Reset the CNOT placement process
 
-    def draw_connection(self, control_row, target_row, col):
-        # Draw the connection line between the control and the target
-        for row in range(min(control_row, target_row) + 1, max(control_row, target_row)):
-            line_cell = ControlledGateCell()
-            line_cell.is_line = True
-            self.grid_layout.addWidget(line_cell, row, col)
-        self.gate_positions[max(control_row, target_row) - 1][col] = "*"  # Set target and line positions
+            if len(gate_info['target']) == gate.num_targets:
+                # All targets placed, draw connection
+                self.draw_gate_connections(col, gate_info)
+                gate_info['started'] = False  # Gate placement finished
 
-    def add_cnot_gate(self, control_row, target_row, col):
-        # Remove existing widgets if any and add ControlledGateCell for the target and line
-        for row in range(5):  # Assuming a 5x5 grid as previously set up
-            item = self.grid_layout.itemAtPosition(row, col)
-            if item:
-                widget = item.widget()
-                if widget:
-                    self.grid_layout.removeWidget(widget)
-                    widget.deleteLater()
+    def update_connections(self):
+        # Clear existing connections
+        self.multiqubit_gate_connections.clear()
 
-            cell = ControlledGateCell(self, row, col)
-            if row == control_row:
-                cell.is_control = True
-            elif row == target_row:
-                cell.is_target = True
-            elif control_row < row < target_row or target_row < row < control_row:
-                cell.is_line = True  # This will draw a vertical line
+        for col, gate_info in self.active_gates.items():
+            if gate_info['started']:
+                continue
 
-            self.grid_layout.addWidget(cell, row, col)
+            # Logic to determine the start and end points of connections
+            for control_row in gate_info['control']:
+                for target_row in gate_info['target']:
+                    start_point = self.calculate_connection_point(control_row, col)
+                    end_point = self.calculate_connection_point(target_row, col)
 
-    def create_or_update_cnot_column(self, col, row):
-        if col in self.control_positions and col in self.target_positions:
-            # If both control and target are already set in this column, show an error message
-            QMessageBox.warning(self, 'Error', 'This column already has a CNOT gate defined.')
-            return
+                    # Store the connections
+                    gate_type = gate_info['type']
+                    if gate_type not in self.multiqubit_gate_connections:
+                        self.multiqubit_gate_connections[gate_type] = []
+                    self.multiqubit_gate_connections[gate_type].append((start_point, end_point))
 
-        if col not in self.control_positions:
-            # Set this cell as the control
-            self.control_positions[col] = row
-            cell = self.grid_layout.itemAtPosition(row, col).widget()
-            if cell:
-                cell.is_control = True
-                cell.update()
-        elif col not in self.target_positions:
-            # Set this cell as the target
-            self.target_positions[col] = row
-            cell = self.grid_layout.itemAtPosition(row, col).widget()
-            if cell:
-                cell.is_target = True
-                cell.update()
+        self.overlay.update()
 
-            # Draw the line between control and target
-            self.update_cnot_connection(col)
-        else:
-            # This is a new column for CNOT, so we'll set this cell as control
-            self.control_positions[col] = row
-            # We need to instantiate a ControlledGateCell, not just update the existing QLabel
-            controlled_gate = ControlledGateCell()
-            controlled_gate.is_control = True  # Set as control
-            self.grid_layout.addWidget(controlled_gate, row, col)
+    def calculate_connection_point(self, row, col):
+        widget = self.grid_layout.itemAtPosition(row, col).widget()
+        if widget:
+            return widget.geometry().center()
+        return QPoint()
 
+    def draw_gate_connections(self, col, gate_info):
+        for control_row in gate_info['control']:
+            for target_row in gate_info['target']:
+                for row in range(min(control_row, target_row) + 1, max(control_row, target_row)):
+                    # Skip drawing a line if a single qubit gate is present
+                    if self.gate_positions[row][col] == "":
+                        line_cell = ControlledGateCell(self, gate_info['type'], row, col)
+                        line_cell.is_line = True
+                        self.grid_layout.addWidget(line_cell, row, col)
 
-    def update_cnot_connection(self, col):
-        if col in self.control_positions and col in self.target_positions:
-            control_row = self.control_positions[col]
-            target_row = self.target_positions[col]
-            for row in range(min(control_row, target_row) + 1, max(control_row, target_row)):
-                cell = self.grid_layout.itemAtPosition(row, col).widget()
-                if cell:
-                    cell.is_control = True  # Using the same flag for drawing lines
-                    cell.update()
+    def update_multiqubit_gate_positions(self, old_row, old_col, new_row, new_col, gate_name):
+        # Iterate through the active_gates to find the gate and update its position
+        for col, gate_info in self.active_gates.items():
+            if gate_info['type'] == gate_name:
+                if old_row in gate_info['control']:
+                    gate_info['control'].remove(old_row)
+                    gate_info['control'].append(new_row)
+                if old_row in gate_info['target']:
+                    gate_info['target'].remove(old_row)
+                    gate_info['target'].append(new_row)
+        
+        # Redraw connections
+        self.update_connections()
 
     def configureGrid(self):
         if self.gridSizeDialog.exec_():
@@ -284,11 +395,13 @@ class MainWidget(QWidget):
         # Clear the existing grid layout first
         for i in reversed(range(self.grid_layout.count())): 
             widget_to_remove = self.grid_layout.itemAt(i).widget()
+            if widget_to_remove:
+                widget_to_remove.deleteLater()
             self.grid_layout.removeWidget(widget_to_remove)
-            widget_to_remove.setParent(None)
-        
+
         # Initialize the 2D list with empty strings
         self.gate_positions = [["" for _ in range(cols)] for _ in range(rows)]
+
         
         # Create the grid with the specified number of rows and columns
         for i in range(rows):
@@ -296,47 +409,15 @@ class MainWidget(QWidget):
                 drop_area = DropArea(self, i, j)
                 self.grid_layout.addWidget(drop_area, i, j)
 
-    def update_overlay(self):
-        # Call this method whenever you need to update the lines
-        self.overlay.cnot_lines.clear()
-
-        # Calculate the start and end points for the CNOT lines
-        for col, cnot in self.cnot_positions.items():
-            if cnot.get('control') is not None and cnot.get('target') is not None:
-                control_widget = self.grid_layout.itemAtPosition(cnot['control'], col).widget()
-                target_widget = self.grid_layout.itemAtPosition(cnot['target'], col).widget()
-
-                # Calculate the center y-coordinates for control and target widgets
-                control_center_y = control_widget.geometry().center().y()
-                target_center_y = target_widget.geometry().center().y()
-
-                # X-coordinate is the same for both points
-                x = control_widget.geometry().center().x()
-
-                self.overlay.cnot_lines.append((QPoint(x, control_center_y), QPoint(x, target_center_y)))
-
-        self.overlay.update()  # Trigger a repaint of the overlay
+        # Clear active gates when resetting grid
+        self.active_gates.clear()
+        self.update_connections()
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()        
         self.main_widget = MainWidget()  # Instantiate MainWidget
         self.setCentralWidget(self.main_widget)  # Set MainWidget as central widget
-
-        self.createTopMenu()
-
-    def createTopMenu(self):
-        menu = self.menuBar()
-        file_menu = QMenu("&File", self)
-        menu.addMenu(file_menu)
-        button_class = QMenu("&Class", self)
-        menu.addMenu(button_class)
-        button_learn = QMenu("&Learn", self)
-        menu.addMenu(button_learn)
-        button_dwave = QAction("&DWave", self)
-        menu.addAction(button_dwave)
-        button_custom_gate = QAction("&Custom Gate Creation", self)
-        menu.addAction(button_custom_gate)
     
 if __name__ == '__main__':
     app = QApplication(sys.argv)
