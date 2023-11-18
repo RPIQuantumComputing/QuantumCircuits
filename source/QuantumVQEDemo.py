@@ -1,12 +1,12 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-from PyQt5 import QtWebEngineWidgets
-from PyQt5.QtWebEngineWidgets import QWebEngineView
-
-from pyscf import gto, scf
 import sys
 from typing import Any
 import numpy as np
+import webbrowser
+import os
+
+from pyscf import gto, scf
 
 from openfermion.transforms import jordan_wigner
 from openfermion.utils import load_operator
@@ -23,9 +23,7 @@ from quri_parts.circuit import LinearMappedUnboundParametricQuantumCircuit
 from quri_parts.core.estimator import create_parametric_estimator
 from quri_parts.core.estimator.gradient import parameter_shift_gradient_estimates
 from quri_parts.core.measurement import bitwise_commuting_pauli_measurement
-from quri_parts.core.sampling.shots_allocator import (
-    create_equipartition_shots_allocator,
-)
+from quri_parts.core.sampling.shots_allocator import create_equipartition_shots_allocator
 from quri_parts.core.state import ParametricCircuitQuantumState, ComputationalBasisState
 from quri_parts.openfermion.operator import operator_from_openfermion_op
 
@@ -33,28 +31,28 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 import matplotlib.pyplot as plt
 
-import mendeleev #this is for getting the various properties of elemntents 
+#this is used to gather the properties of each element in the molecule
+import mendeleev
 from mendeleev import element
 
-#this will be used for the 3d plotting of the molecule
+#plotly used for the 3d modeling 
 import plotly
-
 import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
 
-import webbrowser
-import os
-
-#pio.renderers.default = 'plotly_mimetype'
-
 #run export DISPLAY=:0.0
 
 costs = []
+
 # This is basically QuriPart's competition code with adjustments, will change to my competition code later
 # right now, though, I don't want to add a few dependencies and mess up the docker container
 def cost_fn(hamiltonian, parametric_state, param_values, estimator):
-    estimate = estimator(hamiltonian, parametric_state, [param_values])
+    estimate = estimator(
+        hamiltonian, 
+        parametric_state, 
+        [param_values]
+    )
     return estimate[0].value.real
 
 def vqe(hamiltonian, parametric_state, estimator, init_params, optimizer):
@@ -129,56 +127,50 @@ class Ui_QuantumSimulationGUI(object):
     active_space = None
     active_space_mo_eint_set = None
 
+    #initializes the user interface
     def setupUi(self, QuantumSimulationGUI):
         QuantumSimulationGUI.setObjectName("QuantumSimulationGUI")
         self.centralwidget = QtWidgets.QWidget(QuantumSimulationGUI)
 
-        # Left side layout
+        #left side of the GUI layout
         left_layout = QtWidgets.QVBoxLayout()
 
-        self.textEdit = QtWidgets.QTextEdit()
-        left_layout.addWidget(self.textEdit)
+        #text field to enter molecule
+        self.textField = QtWidgets.QTextEdit()
+        left_layout.addWidget(self.textField)
 
-        # self.textEdit.setHtml(QtCore.QCoreApplication.translate(
-        #     "QuantumSimulationGUI", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
-        #     "<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
-        #     "p, li { white-space: pre-wrap; }\n"
-        #     "</style></head><body style=\" font-family:\'MS Shell Dlg 2\'; font-size:8.1pt; font-weight:400; font-style:normal;\">\n"
-        #     "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">\'\'\'</p>\n"
-        #     "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">H (0,0,0)</p>\n"
-        #     "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">O (2,0,1)</p>\n"
-        #     "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">H (0,0,2)</p>\n"
-        #     "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">\'\'\'</p></body></html>"))
-
+        #button to compute the electronic integrals
         self.pushButton = QtWidgets.QPushButton("Compute Electronic Integrals")
         self.pushButton.clicked.connect(self.on_compute_integrals_clicked)
         left_layout.addWidget(self.pushButton)
 
-        #load widgets for specifying orbitals and electrons
+        #label for the electron and orbitals inpute fields
         self.label_3 = QtWidgets.QLabel("Step 2: Specify the number of orbitals and electrons")
         left_layout.addWidget(self.label_3)
 
-        self.spinBox = QtWidgets.QSpinBox()
-        left_layout.addWidget(self.spinBox)
+        #orbital input field
+        self.orbitalBox = QtWidgets.QSpinBox()
+        left_layout.addWidget(self.orbitalBox)
 
-        self.spinBox_2 = QtWidgets.QSpinBox()
-        left_layout.addWidget(self.spinBox_2)
+        #electron input field
+        self.electronBox = QtWidgets.QSpinBox()
+        left_layout.addWidget(self.electronBox)
 
-        # Right side layout
+        #right side of the GUI layout
         right_layout = QtWidgets.QVBoxLayout()
         right_layout.setSpacing(0)
 
-        # ComboBox for mapping selection
+        #ComboBox for mapping selection
         mappings = ["SELECT MAPPING", "Jordan-Wigner", "Bravyi-Kitaev", "Symmetric Bravyi-Kitaev"]
         self.mappingComboBox = QtWidgets.QComboBox()
-
-        self.mappingComboBox.addItems(mappings)
+        
+        self.mappingComboBox.addItems(mappings) #intialize values of the mapping box
         self.mappingComboBox.setCurrentIndex(0)  #intialize the default to the first mapping
         self.mappingComboBox.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
 
         right_layout.addWidget(self.mappingComboBox)
 
-        # ComboxBox for preset molecules
+        #ComboxBox for preset molecules
         presets = ["OPTIONAL PRESET", "Water", "Calcium Oxide", "Ozone", "Sodium Chloride", "Carbon Dioxide"]
         self.presetComboBox = QtWidgets.QComboBox()
 
@@ -195,26 +187,24 @@ class Ui_QuantumSimulationGUI(object):
         right_layout.addWidget(self.Simulate)
         self.Simulate.clicked.connect(self.on_simulate_clicked)
 
-        # Combine left and right layouts
+        #combine left and right layouts into the main_layout
         main_layout = QtWidgets.QHBoxLayout()
         main_layout.addLayout(left_layout)
         main_layout.addLayout(right_layout)
 
-        # Add the VQE graph to the interface
+        #add the VQE graph to the interface
         self.figure = plt.figure()
         self.canvas = FigureCanvas(self.figure)
-        #self.toolbar = NavigationToolbar(self.canvas, self)
-
         right_layout.addWidget(self.canvas)
 
-        #rest
-        self.centralwidget.setLayout(main_layout)
-        QuantumSimulationGUI.setCentralWidget(self.centralwidget)
+        #format the various layouts 
+        self.centralwidget.setLayout(main_layout) #set the central layout to the main_layout
+        QuantumSimulationGUI.setCentralWidget(self.centralwidget) 
 
-        self.menubar = QtWidgets.QMenuBar(QuantumSimulationGUI)
+        self.menubar = QtWidgets.QMenuBar(QuantumSimulationGUI) #add menubar
         QuantumSimulationGUI.setMenuBar(self.menubar)
 
-        self.statusbar = QtWidgets.QStatusBar(QuantumSimulationGUI)
+        self.statusbar = QtWidgets.QStatusBar(QuantumSimulationGUI) #add statusbar
         QuantumSimulationGUI.setStatusBar(self.statusbar)
 
         self.retranslateUi(QuantumSimulationGUI)
@@ -331,7 +321,7 @@ class Ui_QuantumSimulationGUI(object):
       
     def on_compute_integrals_clicked(self):
         elements = []
-        user_input = self.textEdit.toPlainText()
+        user_input = self.textField.toPlainText()
         lines = user_input.split("\n")
 
         for line in lines:
@@ -363,8 +353,8 @@ class Ui_QuantumSimulationGUI(object):
     def on_simulate_clicked(self):
         try:
             # Compute the Active Space
-            self.number_of_orbitals = int(self.spinBox.value())
-            self.number_of_electrons = int(self.spinBox_2.value())
+            self.number_of_orbitals = int(self.orbitalBox.value())
+            self.number_of_electrons = int(self.electronBox.value())
             self.active_space, self.active_space_mo_eint_set = get_spin_mo_integrals_from_mole(
                 self.user_mol,
                 self.user_mo_coeff,
@@ -412,15 +402,10 @@ class Ui_QuantumSimulationGUI(object):
 
         (molecule, orbitals, electrons) = selected_preset
 
-        self.textEdit.setPlainText(molecule)
-
-        self.spinBox.setValue(4) 
-        self.spinBox_2.setValue(6) 
-
-        self.spinBox.setValue(orbitals)
-        self.spinBox_2.setValue(electrons)
-
-        #load the preset into the box 
+        #load the preset values into their respective fields
+        self.textField.setPlainText(molecule)
+        self.orbitalBox.setValue(orbitals)
+        self.electronBox.setValue(electrons)
 
 if __name__ == "__main__":
     import sys
