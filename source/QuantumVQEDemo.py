@@ -29,6 +29,8 @@ from quri_parts.core.sampling.shots_allocator import (
 from quri_parts.core.state import ParametricCircuitQuantumState, ComputationalBasisState
 from quri_parts.openfermion.operator import operator_from_openfermion_op
 
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 import matplotlib.pyplot as plt
 
 import mendeleev #this is for getting the various properties of elemntents 
@@ -198,10 +200,14 @@ class Ui_QuantumSimulationGUI(object):
         main_layout.addLayout(left_layout)
         main_layout.addLayout(right_layout)
 
-        # Add the ploly graph to the interface
-        self.render = QWebEngineView()
-        right_layout.addWidget(self.render)
+        # Add the VQE graph to the interface
+        self.figure = plt.figure()
+        self.canvas = FigureCanvas(self.figure)
+        #self.toolbar = NavigationToolbar(self.canvas, self)
 
+        right_layout.addWidget(self.canvas)
+
+        #rest
         self.centralwidget.setLayout(main_layout)
         QuantumSimulationGUI.setCentralWidget(self.centralwidget)
 
@@ -307,9 +313,6 @@ class Ui_QuantumSimulationGUI(object):
             showlegend=False
         )
 
-        html_content = fig.to_html(full_html=False)
-        self.render.setHtml(html_content)
-
         fig.show()
 
     def parseLine(self, line):
@@ -370,17 +373,26 @@ class Ui_QuantumSimulationGUI(object):
             # Implicitly, the active space is cutting down the ansatz to only consider a smaller problem space
             # Consider the active molecular problem and then the reduced one
             active_space_jw_hamiltonian, active_space_operator_mapper, active_space_state_mapper = get_qubit_mapped_hamiltonian(
-                self.active_space, self.active_space_mo_eint_set
+                self.active_space, 
+                self.active_space_mo_eint_set
             )
             # Let us perform the simulation!
             algo_run = RunAlgorithm()
             print("Final Energy Estimate: ", algo_run.get_result(active_space_jw_hamiltonian, self.number_of_electrons, self.number_of_orbitals))
 
+            # clear the figure
+            self.figure.clear()
+
+            #add the axes
+            ax = self.figure.add_subplot(111)
+            ax.set_xlabel("Iteration of VQE")
+            ax.set_ylabel("Energy Evaluation (eV)")
+
+            # plot data
             global costs
-            plt.plot(costs)
-            plt.xlabel("Iteration of VQE")
-            plt.ylabel("Energy Evaluation (eV)")
-            plt.show()
+
+            ax.plot(costs, '*-')
+            self.canvas.draw()
         except:
             print("Error: Invalid Electron/Orbital Configuration or Structure!")
 
