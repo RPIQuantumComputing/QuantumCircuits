@@ -138,14 +138,81 @@ plt.ylim((0, 1))
 plt.xlabel("steps")
 plt.ylabel("cost")
 plt.show()
+
+
+
+
+
 """""
-iris = datasets.load_iris()
-X = iris.data
-y = iris.target
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-svm = SVC()
-svm.fit(X_train, y_train)
-y_pred = svm.predict(X_test)
-accuracy = accuracy_score(y_test, y_pred)
-print("Accuracy: ", accuracy)
+this bit isn't working 
 """
+
+def circuit_evals_variational(n_data, n_params, n_steps, shift_terms, split, batch_size):
+
+    M = int(np.ceil(split * n_data))
+    Mpred = n_data - M
+
+    n_training = n_params * n_steps * batch_size * shift_terms
+    n_prediction = Mpred
+
+    return n_training + n_prediction
+
+circuit_evals_variational(
+    n_data=len(X),
+    n_params=len(trained_params.flatten()),
+    n_steps=steps,
+    shift_terms=2,
+    split=len(X_train) /(len(X_train) + len(X_test)),
+    batch_size=batch_size,
+)
+
+def model_evals_nn(n_data, n_params, n_steps, split, batch_size):
+    """Compute how many model evaluations are needed for neural
+       network training and prediction."""
+
+    M = int(np.ceil(split * n_data))
+    Mpred = n_data - M
+
+    n_training = n_steps * batch_size
+    n_prediction = Mpred
+
+    return n_training + n_prediction
+
+
+variational_training1 = []
+variational_training2 = []
+kernelbased_training = []
+nn_training = []
+x_axis = range(0, 2000, 100)
+
+for M in x_axis:
+
+    var1 = circuit_evals_variational(
+        n_data=M, n_params=M, n_steps=M,  shift_terms=2, split=0.75, batch_size=1
+    )
+    variational_training1.append(var1)
+
+    var2 = circuit_evals_variational(
+        n_data=M, n_params=round(np.sqrt(M)), n_steps=M,
+        shift_terms=2, split=0.75, batch_size=1
+    )
+    variational_training2.append(var2)
+
+    kernel = circuit_evals_kernel(n_data=M, split=0.75)
+    kernelbased_training.append(kernel)
+
+    nn = model_evals_nn(
+        n_data=M, n_params=M, n_steps=M, split=0.75, batch_size=1
+    )
+    nn_training.append(nn)
+
+
+plt.plot(x_axis, nn_training, linestyle='--', label="neural net")
+plt.plot(x_axis, variational_training1, label="var. circuit (linear param scaling)")
+plt.plot(x_axis, variational_training2, label="var. circuit (srqt param scaling)")
+plt.plot(x_axis, kernelbased_training, label="(quantum) kernel")
+plt.xlabel("size of data set")
+plt.ylabel("number of evaluations")
+plt.legend()
+plt.tight_layout()
+plt.show()
