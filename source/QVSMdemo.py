@@ -12,6 +12,11 @@ import pennylane as qml
 from pennylane.templates import AngleEmbedding, StronglyEntanglingLayers
 from pennylane.operation import Tensor
 
+from sklearn import datasets
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score
+
 import matplotlib.pyplot as plt
 
 np.random.seed(42)
@@ -53,11 +58,9 @@ def circuit_evals_kernel(n_data, split):
     n_prediction = M * Mpred
     return n_training + n_prediction
 
-# Compute the number of circuit evaluations
 n_evals = circuit_evals_kernel(len(X), len(X_train) / (len(X_train) + len(X_test)))
 print("Number of circuit evaluations:", n_evals)
 
-# Implementing variational training
 dev_var = qml.device("lightning.qubit", wires=n_qubits)
 
 @qml.qnode(dev_var, diff_method="parameter-shift")
@@ -107,18 +110,35 @@ def quantum_model_train(n_layers, steps, batch_size):
 
     return params_torch, bias_torch, loss_history
 
-#def quantum_model_predict(X_pred, trained_params, trained_bias):
-    #print(1)
-    #p = []
-    #for x in X_pred:
-        #x_torch = torch.tensor(x)
-        #pred_torch = quantum_model_plus_bias(x_tSure! Here's an example of a Python code that demonstrates how to implement a simple SVM using scikit-learn:
+def quantum_model_predict(X_pred, trained_params, trained_bias):
+    p = []
+    for x in X_pred:
 
-from sklearn import datasets
-from sklearn.model_selection import train_test_split
-from sklearn.svm import SVC
-from sklearn.metrics import accuracy_score
+        x_torch = torch.tensor(x)
+        pred_torch = quantum_model_plus_bias(x_torch, trained_params, trained_bias)
+        pred = pred_torch.detach().numpy().item()
+        if pred > 0:
+            pred = 1
+        else:
+            pred = -1
 
+        p.append(pred)
+    return p
+
+n_layers = 2
+batch_size = 20
+steps = 100
+trained_params, trained_bias, loss_history = quantum_model_train(n_layers, steps, batch_size)
+
+pred_test = quantum_model_predict(X_test, trained_params, trained_bias)
+print("accuracy on test set:", accuracy_score(pred_test, y_test))
+
+plt.plot(loss_history)
+plt.ylim((0, 1))
+plt.xlabel("steps")
+plt.ylabel("cost")
+plt.show()
+"""""
 iris = datasets.load_iris()
 X = iris.data
 y = iris.target
@@ -128,4 +148,4 @@ svm.fit(X_train, y_train)
 y_pred = svm.predict(X_test)
 accuracy = accuracy_score(y_test, y_pred)
 print("Accuracy: ", accuracy)
-
+"""
