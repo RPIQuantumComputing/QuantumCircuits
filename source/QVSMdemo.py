@@ -19,37 +19,6 @@ from sklearn.metrics import accuracy_score
 
 import matplotlib.pyplot as plt
 
-np.random.seed(42)
-
-X, y = load_iris(return_X_y=True)
-X = X[:100]
-y = y[:100]
-scaler = StandardScaler().fit(X)
-X_scaled = scaler.transform(X)
-y_scaled = 2 * (y - 0.5)
-X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_scaled)
-
-n_qubits = len(X_train[0])
-dev_kernel = qml.device("lightning.qubit", wires=n_qubits)
-projector = np.zeros((2**n_qubits, 2**n_qubits))
-projector[0, 0] = 1
-
-@qml.qnode(dev_kernel)
-def kernel(x1, x2):
-    AngleEmbedding(x1, wires=range(n_qubits))
-    qml.adjoint(AngleEmbedding)(x2, wires=range(n_qubits))
-    return qml.expval(qml.Hermitian(projector, wires=range(n_qubits)))
-
-def kernel_matrix(A, B):
-    return np.array([[kernel(a, b) for b in B] for a in A])
-
-svm = SVC(kernel=kernel_matrix).fit(X_train, y_train)
-
-predictions = svm.predict(X_test)
-accuracy = accuracy_score(predictions, y_test)
-print("Accuracy:", accuracy)
-
-print("Number of quantum device evaluations:", dev_kernel.num_executions)
 
 def circuit_evals_kernel(n_data, split):
     M = int(np.ceil(split * n_data))
@@ -58,27 +27,13 @@ def circuit_evals_kernel(n_data, split):
     n_prediction = M * Mpred
     return n_training + n_prediction
 
-n_evals = circuit_evals_kernel(len(X), len(X_train) / (len(X_train) + len(X_test)))
-print("Number of circuit evaluations:", n_evals)
-
-dev_var = qml.device("lightning.qubit", wires=n_qubits)
-
-@qml.qnode(dev_var, diff_method="parameter-shift")
-def quantum_model(x, params):
-    AngleEmbedding(x, wires=range(n_qubits))
-    StronglyEntanglingLayers(params, wires=range(n_qubits))
-    return qml.expval(qml.PauliZ(0))
-
-def quantum_model_plus_bias(x, params, bias):
-    return quantum_model(x, params) + bias
-
 def hinge_loss(predictions, targets):
     all_ones = torch.ones_like(targets)
     hinge_loss = all_ones - predictions * targets
     hinge_loss = relu(hinge_loss)
     return hinge_loss
 
-def quantum_model_train(n_layers, steps, batch_size):
+def quantum_model_train(n_layers, steps, batch_size, n_qubits , X_train, y_train):
     params = np.random.random((n_layers, n_qubits, 3))
     params_torch = torch.tensor(params, requires_grad=True)
     bias_torch = torch.tensor(0.0)
@@ -125,21 +80,6 @@ def quantum_model_predict(X_pred, trained_params, trained_bias):
         p.append(pred)
     return p
 
-n_layers = 2
-batch_size = 25
-steps = 100
-trained_params, trained_bias, loss_history = quantum_model_train(n_layers, steps, batch_size)
-
-pred_test = quantum_model_predict(X_test, trained_params, trained_bias)
-print("accuracy on test set:", accuracy_score(pred_test, y_test))
-
-plt.plot(loss_history)
-plt.ylim((0, 1))
-plt.xlabel("steps")
-plt.ylabel("cost")
-plt.show()
-
-
 def circuit_evals_variational(n_data, n_params, n_steps, shift_terms, split, batch_size):
 
     M = int(np.ceil(split * n_data))
@@ -150,16 +90,7 @@ def circuit_evals_variational(n_data, n_params, n_steps, shift_terms, split, bat
 
     return n_training + n_prediction
 
-circuit_evals_variational(
-    n_data=len(X),
-    n_params=len(trained_params.flatten()),
-    n_steps=steps,
-    shift_terms=2,
-    split=len(X_train) /(len(X_train) + len(X_test)),
-    batch_size=batch_size,
-)
-
-def model_evals_nn(n_data, n_params, n_steps, split, batch_size):
+def model_evals_nn(n_data, n_steps, split, batch_size):
 
 
     M = int(np.ceil(split * n_data))
@@ -170,41 +101,109 @@ def model_evals_nn(n_data, n_params, n_steps, split, batch_size):
 
     return n_training + n_prediction
 
+if __name__ == "__main__":
+    np.random.seed(42)
+    X, y = load_iris(return_X_y=True)
+    X = X[:100]
+    y = y[:100]
+    scaler = StandardScaler().fit(X)
+    X_scaled = scaler.transform(X)
+    y_scaled = 2 * (y - 0.5)
+    X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_scaled)
 
-variational_training1 = []
-variational_training2 = []
-kernelbased_training = []
-nn_training = []
-x_axis = range(0, 2000, 100)
+    n_qubits = len(X_train[0])
+    dev_kernel = qml.device("lightning.qubit", wires=n_qubits)
+    projector = np.zeros((2**n_qubits, 2**n_qubits))
+    projector[0, 0] = 1
 
-for M in x_axis:
+    @qml.qnode(dev_kernel)
+    def kernel(x1, x2):
+        AngleEmbedding(x1, wires=range(n_qubits))
+        qml.adjoint(AngleEmbedding)(x2, wires=range(n_qubits))
+        return qml.expval(qml.Hermitian(projector, wires=range(n_qubits)))
+    
+    def kernel_matrix(A, B):
+        return np.array([[kernel(a, b) for b in B] for a in A])
+    
+    svm = SVC(kernel=kernel_matrix).fit(X_train, y_train)
 
-    var1 = circuit_evals_variational(
-        n_data=M, n_params=M, n_steps=M,  shift_terms=2, split=0.75, batch_size=1
+    predictions = svm.predict(X_test)
+    accuracy = accuracy_score(predictions, y_test)
+    print("Accuracy:", accuracy)
+
+    print("Number of quantum device evaluations:", dev_kernel.num_executions)
+
+    n_evals = circuit_evals_kernel(len(X), len(X_train) / (len(X_train) + len(X_test)))
+    print("Number of circuit evaluations:", n_evals)
+
+    dev_var = qml.device("lightning.qubit", wires=n_qubits)
+
+    @qml.qnode(dev_var, diff_method="parameter-shift")
+    def quantum_model(x, params):
+        AngleEmbedding(x, wires=range(n_qubits))
+        StronglyEntanglingLayers(params, wires=range(n_qubits))
+        return qml.expval(qml.PauliZ(0))
+
+    def quantum_model_plus_bias(x, params, bias):
+        return quantum_model(x, params) + bias
+    
+
+    n_layers = 2
+    batch_size = 25
+    steps = 100
+    trained_params, trained_bias, loss_history = quantum_model_train(n_layers, steps, batch_size, n_qubits, X_train, y_train)
+                                                                     
+    pred_test = quantum_model_predict(X_test, trained_params, trained_bias)
+    print("accuracy on test set:", accuracy_score(pred_test, y_test))
+
+    plt.plot(loss_history)
+    plt.ylim((0, 1))
+    plt.xlabel("steps")
+    plt.ylabel("cost")
+    plt.show()
+
+    circuit_evals_variational(
+    n_data=len(X),
+    n_params=len(trained_params.flatten()),
+    n_steps=steps,
+    shift_terms=2,
+    split=len(X_train) /(len(X_train) + len(X_test)),
+    batch_size=batch_size,
     )
-    variational_training1.append(var1)
+    variational_training1 = []
+    variational_training2 = []
+    kernelbased_training = []
+    nn_training = []
+    x_axis = range(0, 2000, 100)
 
-    var2 = circuit_evals_variational(
-        n_data=M, n_params=round(np.sqrt(M)), n_steps=M,
-        shift_terms=2, split=0.75, batch_size=1
-    )
-    variational_training2.append(var2)
+    for M in x_axis:
 
-    kernel = circuit_evals_kernel(n_data=M, split=0.75)
-    kernelbased_training.append(kernel)
+        var1 = circuit_evals_variational(
+            n_data=M, n_params=M, n_steps=M,  shift_terms=2, split=0.75, batch_size=1
+        )
+        variational_training1.append(var1)
 
-    nn = model_evals_nn(
-        n_data=M, n_params=M, n_steps=M, split=0.75, batch_size=1
-    )
-    nn_training.append(nn)
+        var2 = circuit_evals_variational(
+            n_data=M, n_params=round(np.sqrt(M)), n_steps=M,
+            shift_terms=2, split=0.75, batch_size=1
+        )
+        variational_training2.append(var2)
 
+        kernel = circuit_evals_kernel(n_data=M, split=0.75)
+        kernelbased_training.append(kernel)
 
-plt.plot(x_axis, nn_training, linestyle='--', label="neural net")
-plt.plot(x_axis, variational_training1, label="var. circuit (linear param scaling)")
-plt.plot(x_axis, variational_training2, label="var. circuit (srqt param scaling)")
-plt.plot(x_axis, kernelbased_training, label="(quantum) kernel")
-plt.xlabel("size of data set")
-plt.ylabel("number of evaluations")
-plt.legend()
-plt.tight_layout()
-plt.show()
+        nn = model_evals_nn(
+        n_data=M, n_steps=M, split=0.75, batch_size=1
+        )
+
+        nn_training.append(nn)
+
+    plt.plot(x_axis, nn_training, linestyle='--', label="neural net")
+    plt.plot(x_axis, variational_training1, label="var. circuit (linear param scaling)")
+    plt.plot(x_axis, variational_training2, label="var. circuit (srqt param scaling)")
+    plt.plot(x_axis, kernelbased_training, label="(quantum) kernel")
+    plt.xlabel("size of data set")
+    plt.ylabel("number of evaluations")
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
