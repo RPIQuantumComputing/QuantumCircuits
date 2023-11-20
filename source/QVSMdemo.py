@@ -126,7 +126,7 @@ def quantum_model_predict(X_pred, trained_params, trained_bias):
     return p
 
 n_layers = 2
-batch_size = 20
+batch_size = 25
 steps = 100
 trained_params, trained_bias, loss_history = quantum_model_train(n_layers, steps, batch_size)
 
@@ -139,13 +139,6 @@ plt.xlabel("steps")
 plt.ylabel("cost")
 plt.show()
 
-
-
-
-
-"""""
-this bit isn't working 
-"""
 
 def circuit_evals_variational(n_data, n_params, n_steps, shift_terms, split, batch_size):
 
@@ -167,8 +160,7 @@ circuit_evals_variational(
 )
 
 def model_evals_nn(n_data, n_params, n_steps, split, batch_size):
-    """Compute how many model evaluations are needed for neural
-       network training and prediction."""
+
 
     M = int(np.ceil(split * n_data))
     Mpred = n_data - M
