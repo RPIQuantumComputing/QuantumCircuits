@@ -28,7 +28,7 @@ from quri_parts.core.state import ParametricCircuitQuantumState, ComputationalBa
 from quri_parts.openfermion.operator import operator_from_openfermion_op
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+# from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 import matplotlib.pyplot as plt
 
 #this is used to gather the properties of each element in the molecule
@@ -58,28 +58,34 @@ def cost_fn(hamiltonian, parametric_state, param_values, estimator):
 def vqe(hamiltonian, parametric_state, estimator, init_params, optimizer):
     opt_state = optimizer.get_init_state(init_params)
 
-    def c_fn(param_values):
-        return cost_fn(hamiltonian, parametric_state, param_values, estimator)
+    def c_fn(param_values): 
+        return cost_fn(hamiltonian, 
+                       parametric_state, 
+                       param_values, 
+                       estimator)
 
     def g_fn(param_values):
         grad = parameter_shift_gradient_estimates(
-            hamiltonian, parametric_state, param_values, estimator
+            hamiltonian, 
+            parametric_state, 
+            param_values, 
+            estimator
         )
         return np.asarray([i.real for i in grad.values])
 
+    print("\n" + '-' * 80)
     while True:
-        if(True):
-            opt_state = optimizer.step(opt_state, c_fn, g_fn)
-            print(f"iteration {opt_state.niter}")
-            print(opt_state.cost)
-            global costs
-            costs.append(opt_state.cost)
+        opt_state = optimizer.step(opt_state, c_fn, g_fn)
+        print(f"ITERATION {opt_state.niter:<5} COST: {opt_state.cost}")
+
+        global costs
+        costs.append(opt_state.cost)
 
         if opt_state.status == OptimizerStatus.FAILED:
-            print("Optimizer failed")
+            print("\nOPTIMIZER STATUS:       FAILED")
             break
-        if opt_state.status == OptimizerStatus.CONVERGED:
-            print("Optimizer converged")
+        elif opt_state.status == OptimizerStatus.CONVERGED:
+            print("\nOPTIMIZER STATUS:       CONVERGED")
             break
     return opt_state
 
@@ -115,7 +121,7 @@ class RunAlgorithm:
             init_param,
             adam_optimizer,
         )
-        print(f"iteration used: {result.niter}")
+        print(f"TOTAL ITERATIONS:       {result.niter}")
         return result.cost
 
 # The simulation method heavily uses https://quri-parts.qunasys.com/tutorials/quantum_chemistry/mo_eint_and_hamiltonial's
@@ -330,8 +336,6 @@ class Ui_QuantumSimulationGUI(object):
                 if(parsed != None):
                     elements.append(parsed)
 
-        #print(elements)
-
         #make a 3d model of the molecule
         self.generate3dMolecule(elements)
         
@@ -368,7 +372,12 @@ class Ui_QuantumSimulationGUI(object):
             )
             # Let us perform the simulation!
             algo_run = RunAlgorithm()
-            print("Final Energy Estimate: ", algo_run.get_result(active_space_jw_hamiltonian, self.number_of_electrons, self.number_of_orbitals))
+            print("FINAL ENERGY ESTIMATE: {} eV\n{}".format(
+                algo_run.get_result(
+                    active_space_jw_hamiltonian, 
+                    self.number_of_electrons, 
+                    self.number_of_orbitals
+                ), ('-' * 80)))
 
             # clear the figure
             self.figure.clear()
