@@ -27,13 +27,13 @@ from qiskit import QuantumCircuit
 from qiskit import IBMQ, Aer, transpile, execute
 import qiskit
 from qiskit.tools.visualization import plot_histogram, plot_state_city
-from qiskit_aer.library.save_instructions import save_statevector, 
+from qiskit_aer.library.save_instructions import save_statevector
 import qiskit.quantum_info as qi
 from qiskit_aer.noise import NoiseModel
-from qiskit.test.mock import FakeToronto, FakeVigo, FakeAlmaden, FakeBoeblingen, FakeBrooklyn, FakeCairo, FakeRueschlikon, FakeSingapore FakeNairobi
+from qiskit.test.mock import FakeToronto, FakeVigo, FakeAlmaden, FakeBoeblingen, FakeBrooklyn, FakeCairo, FakeRueschlikon, FakeSingapore, FakeNairobi
 from qiskit_aer import AerSimulator
 
-class HamiltonionBackend:
+class HamiltonianBackend:
     provider = "Local"
     settings = None
     histogramResult = None
@@ -256,7 +256,7 @@ class FeynmanBackend:
         self.histogramResult = plt
         print(self.results)
         
-class HamiltonionCuQuantumBackend:
+class HamiltonianCuQuantumBackend:
     provider = "Local"
     settings = None
     histogramResult = None
@@ -683,11 +683,11 @@ class QiskitBackend:
             print(self.results)
 
 # Backend factor to create gates
-def BackendFactory(backendType="HamiltionSimulation", settings=SettingsFile.Settings()):
+def BackendFactory(backendType="HamiltonianSimulation", settings=SettingsFile.Settings()):
     backendTypes = {
-        "HamiltionSimulation" : HamiltonionBackend,
+        "HamiltonianSimulation" : HamiltonianBackend,
         "FeynmanSimulation" : FeynmanBackend,
-        "HamiltionSimulationCuQuantum": HamiltonionCuQuantumBackend,
+        "HamiltonianSimulationCuQuantum": HamiltonianCuQuantumBackend,
         "DWaveSimulation" : DWaveBackend,
         "Photonic": XanaduBackend,
         "Qiskit": QiskitBackend

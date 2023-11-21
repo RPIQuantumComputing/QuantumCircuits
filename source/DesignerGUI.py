@@ -186,7 +186,7 @@ def runSimulation():
         plt = designer.getVisualization()
         plt.show()
     else:
-        if(designer.settings.backend == "HamiltionSimulationCuQuantum"):
+        if(designer.settings.backend == "HamiltonianSimulationCuQuantum"):
             global cuQuantum
             bitstrings = cuQuantumBitStrings.strip().split("\n")
             for entry in bitstrings:
@@ -231,14 +231,14 @@ def runSimulation():
 
 #changes settingfile based on user choice
 def changeSimulationTechniqueHamiltonian():
-    designer.setBackend("HamiltionSimulation")
-    print("Changed backend to Hamiltion Simulation")
+    designer.setBackend("HamiltonianSimulation")
+    print("Changed backend to Hamiltonian Simulation")
     forceUpdate()
 def changeSimulationTechniqueHamiltonianCuQuantum():
     global cuQuantumTab
     cuQuantumTab.show()
-    designer.setBackend("HamiltionSimulationCuQuantum")
-    print("Changed backend to Hamiltion CuQuantum Simulation")
+    designer.setBackend("HamiltonianSimulationCuQuantum")
+    print("Changed backend to Hamiltonian CuQuantum Simulation")
     forceUpdate()
 def changeSimulationTechniqueFeynman():
     designer.setBackend("FeynmanSimulation")
@@ -1098,7 +1098,7 @@ class Window(QMainWindow):
 
         # Simulation selection panel
         Simulation = QLabel("Simulation Technique")
-        sim_selection = ["Hamiltionian", "Hamiltonian CuQuantum", "Feynman", "DWave Ocean", "Qiskit", "Xanadu"]
+        sim_selection = ["Hamiltonian", "Hamiltonian CuQuantum", "Feynman", "DWave Ocean", "Qiskit", "Xanadu"]
         self.sim_box = QComboBox()
         self.sim_box.addItems(sim_selection)
         self.sim_box.currentIndexChanged.connect(self.updateSimulationTechnique)
@@ -1120,8 +1120,6 @@ class Window(QMainWindow):
     def createNoiseSettings(self):
         self.NoiseSettings = QGroupBox("Noise Settings")
 
-        layout = QVBoxLayout()
-
         is_noise_enabled = QCheckBox("Enable Noise")
         is_noise_enabled.toggled.connect(self.TypeOnClicked)
         is_noise_enabled.callsign = "is_noise_enabled"
@@ -1134,22 +1132,6 @@ class Window(QMainWindow):
         readout_error.toggled.connect(self.TypeOnClicked)
         readout_error.callsign = "readout_error"
 
-        temperature = QSpinBox(self.NoiseSettings)
-        temperature.setValue(0)
-        temperature.callsign = "temperature"
-        temperature.setMinimum(0)
-        temperature.setMaximum(2147483647)
-        temperature_label = QLabel("Temperature (mK): ")
-        temperature.valueChanged.connect(self.UpdateParameters)
-
-        shots = QSpinBox(self.NoiseSettings)
-        shots.callsign = "shots"
-        shots.setMinimum(1)
-        shots.setMaximum(2147483647)
-        shots.setValue(1024)
-        shots_label = QLabel("Shots: ")
-        shots.valueChanged.connect(self.UpdateParameters)
-
         fake_provider_label = QLabel("Noise Model")
         fake_provider_qubits = {"Toronto": 27, "Vigo": 5, "Almaden": 100, "Boeblingen": 100, "Brooklyn": 100, "Cairo": 27, 
                                 "Rueschlikon": 16, "Singapore": 100, "Nairobi": 7}
@@ -1161,7 +1143,9 @@ class Window(QMainWindow):
         self.fake_provider_box.addItems(fake_provider_selection)
         self.fake_provider_box.currentIndexChanged.connect(self.updateFakeProvider)
 
-        if (designer.settings.backend == "HamiltionSimulation"):
+        layout = QVBoxLayout()
+        
+        if (designer.settings.backend == "HamiltonianSimulation"):
             layout.addWidget(is_noise_enabled)
             layout.addWidget(fake_provider_label)
             layout.addWidget(self.fake_provider_box)
@@ -1170,8 +1154,24 @@ class Window(QMainWindow):
             layout.addWidget(is_noise_enabled)
             layout.addWidget(gate_error)
             layout.addWidget(readout_error)
+
+            temperature = QSpinBox(self.NoiseSettings)
+            temperature.setValue(0)
+            temperature.callsign = "temperature"
+            temperature.setMinimum(0)
+            temperature.setMaximum(2147483647)
+            temperature_label = QLabel("Temperature (mK): ")
+            temperature.valueChanged.connect(self.UpdateParameters)
             layout.addWidget(temperature_label)
             layout.addWidget(temperature)
+
+            shots = QSpinBox(self.NoiseSettings)
+            shots.callsign = "shots"
+            shots.setMinimum(1)
+            shots.setMaximum(2147483647)
+            shots.setValue(1024)
+            shots_label = QLabel("Shots: ")
+            shots.valueChanged.connect(self.UpdateParameters)
             layout.addWidget(shots_label)
             layout.addWidget(shots)
             

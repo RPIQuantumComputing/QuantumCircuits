@@ -1,7 +1,7 @@
 # Settings class
 class Settings:
     # Basically a structure of relevant simulation information
-    backend = "HamiltionSimulation"
+    backend = "HamiltonianSimulation"
     num_qubits = 5
     num_width = 8
     isNoiseEnabled = False
