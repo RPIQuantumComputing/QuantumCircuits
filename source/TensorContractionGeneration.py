@@ -22,23 +22,35 @@ while i < numRows:
     grid[i] = rowValues.split()
     # checking if the number of inputs is correct
     if (len(grid[i]) != numCols):
-        print("Please input the correct number of inputs in row")
+        print("You input does not contain the right amount of values.")
         # if incorrect, decrement i by 1 to go back in loop
         i -= 1
+    # checking if the inserted elements are valid
+    else:
+        invalid = False;
+        for element in range(0, len(grid[i])):
+            if (grid[i][element] == "-" or grid[i][element] == "H" or grid[i][element] == "S" or grid[i][element] == "*" or grid[i][element] == "CNOT" or grid[i][element] == "CCX"):
+                invalid = False;
+            else:
+                invalid = True;
+                break;
+        if (invalid == True):
+            print("Your input contains invalid characters.")
+            i -= 1
     i += 1
 
 # printing out the matrix
-for row in range (0, numRows):
-    for column in range (0, numCols):
-        print(grid[row][column], end = " ")
-    print()
+# for row in range (0, numRows):
+#     for column in range (0, numCols):
+#         print(grid[row][column], end = " ")
+#     print()
 
 # grid = [["H", "H", "S", "-", "-"], ["CNOT", "*", "-", "-", "-"], ["-", "CNOT", "*", "-", "-"],
 #        ["CNOT", "*", "CCX", "*", "*"], ["CCX", "*", "*", "S", "-"], ["S", "-", "-", "-", "-"]]
 # grid = [["H", "H", "H", "H"], ["CX", "*", "X(1/2)", "T"], ["X(1/2)", "CX", "*", "Y(1/2)"], ["T", "X(1/2)", "CX", "*"], ["CX", "-", "-", "*"], ["H", "H", "H", "H"]]
 # ["CX", "*", "-", "-"], ["-", "CX", "*", "-"], 
 #        ["-", "-", "CX", "*"],
-#grid = [["CX", "-", "-", "*"]]
+# grid = [["CX", "-", "-", "*"]]
 # grid[col][row]
 
 # LL(1) Grammar to parse grid implemented using recursive descent
