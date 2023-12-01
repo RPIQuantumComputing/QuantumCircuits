@@ -1,5 +1,5 @@
 import SettingsFile
-import BackendFile
+import BackendFile as BackendFile
 
 # Makes a simulation object
 class Simulation:
@@ -27,18 +27,21 @@ class Simulation:
         self.grid = newGrid
 
     # Runs simulation if results requested or obtains them from prior run
-    def get_results(self, rerun=False):
+    def get_results(self, rerun=False, show=True):
         if(self.ranBefore == False or rerun == True):
             self.backend.sendRequest(self.gridWidth, self.gridHeight, self.grid)
+            if show:
+               self.backend.display()
             self.ranBefore = True
         if(self.backend != None):
             return self.backend.results
         return None
 
     # Runs simulation if results requested or obtains them from prior run
-    def get_visualization(self, rerun=False):
+    def get_visualization(self, rerun=False, show=True):
         if(self.ranBefore == False or rerun == True):
-            self.backend.sendRequest(self.gridWidth, self.gridHeight, self.grid)
+            if show:
+                self.backend.sendRequest(self.gridWidth, self.gridHeight, self.grid)
             self.ranBefore = True
         if(self.backend != None):
             return self.backend.histogramResult

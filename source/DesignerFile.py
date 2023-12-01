@@ -39,17 +39,17 @@ def get_api_key():
     api_key = simpledialog.askstring("API Key Request", "Please enter your API key:")
     return api_key
 
-def getGrid(grid, gridWidth, gridHeight):
-    circuitOperators = [['-' for j in range(gridHeight)] for i in range(gridWidth)]
-    for widthIdx in range(gridWidth):
-        for heightIdx in range(gridHeight):
-            name = grid[widthIdx][heightIdx].getName()
-            if('CNOT' in name or 'CX' in name):
-                print("Setting")
-                circuitOperators[widthIdx][heightIdx+1] = "*"
-            if(name != '-'):
-                circuitOperators[widthIdx][heightIdx] = name
-    return circuitOperators
+
+class Designer:
+    # Store necessary field elements
+    numSinceLastShown = 100
+    gridHeight = -1
+    gridWidth = -1
+    grid = []
+    tempGrid = []
+    settings = SettingsFile.Settings()
+    result = None
+    resultingHistogram = None
 
 def getInstructions(object_grid, gridWidth, gridHeight):
     grid = getGrid(object_grid, gridWidth, gridHeight)
@@ -186,42 +186,31 @@ class HamiltonionBackend:
         plt.title("Probability Distribution of Given Quantum Circuit")
         self.histogramResult = plt
         self.results = results
-
-class FeynmanBackend:
-    provider = "Local"
-    settings = None
-    histogramResult = None
-    results = None
-
-    def __init__(self, newSettings):
-        self.settings = newSettings
+        
+    """ 
+    TODO:
+        Fix this bug. The backend needs to constantly updated. 
+    """
+    def update(self, show):
+        simulation = SimulationFile.Simulation(self.settings)
+        simulation.sendStateInfo(self.gridWidth, self.gridHeight, self.grid)
+        self.result = simulation.get_results(show=show)
+        self.resultingHistogram = simulation.get_visualization()
     
-    def sendAPIToken(api_string):
-        pass
-    
-    def sendRequest(self, gridWidth, gridHeight, grid):
-        # Do similar decomposition process
-        instructions = getInstructions(grid, gridWidth, gridHeight)
-        numQubits = gridHeight
-        numDepth = gridWidth
+    # Specify simulation settings, send grid information, run simulation, and get results
+    def runSimulation(self):
+        self.settings.shots = 256
+        print(self.settings.specialGridSettings)
+        self.update(show=True)
 
-        # Make qiskit circuit
-        circuit = QuantumCircuit(numQubits)
-        circuit = makeCircuit(circuit, instructions)     
-        circuit.measure_all()        
-        # Save results
-        simulator = Aer.get_backend('aer_simulator_density_matrix')
-        self.results = simulator.run(circuit).result().get_counts(circuit)
-        fig = plt.figure(figsize = (20, 5))
-        xVal = []
-        yVal = []
-        total = 0
-        # Turn into histogram format
-        for _, y in self.results.items():
-            total += y
-        for a, b in self.results.items():
-            xVal.append(a)
-            yVal.append((b / total) * 100)
+    # Return back found result histogram
+    def getVisualization(self):
+        return self.resultingHistogram
+
+    # Return back found result
+    def getStatistics(self):
+        self.update(show=False)
+        return self.result
 
         df = pd.DataFrame(
             dict(
@@ -554,6 +543,7 @@ class QiskitBackend:
         circuit = QuantumCircuit(numQubits)
         circuit = makeCircuit(circuit, instructions)     
         circuit.measure_all()
+
         if(self.API_Token == "NONE"):
             self.API_Token = get_api_key()
         
