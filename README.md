@@ -36,7 +36,7 @@ Note, one can also use the provided Dockerfile explicitly.
   2) docker network create local
   3) docker run --gpus all -ti --net=local -p 8905:8905 -p 8906:8906 quantumcircuits (remove --gpus all, if you do not have a Nvidia GPU)
 
-Once in the enviornment, one can run "jupyter notebook --port=8905 --no-browser --ip=0.0.0.0 --allow-root" to launch a jupyter notebook or run "cd QuantumCircuits/source" with "python DesignerGUI.py" to launch the application
+Once in the enviornment, one can run "jupyter notebook --port=8905 --no-browser --ip=0.0.0.0 --allow-root" to launch a jupyter notebook or run "cd ../QuantumCircuits/source" with "python DesignerGUI.py" to launch the application
 
 # Install Instructions (for x86/x64 systems) [No Requirements]
 
@@ -45,24 +45,23 @@ Click upper right and download ".zip", open terminal in extracted directory
 Windows: Run "bash installWindows.sh" and follow prompt instructions
 
 Linux: 
-    1) You have to run the cuda installer: 
-        https://developer.nvidia.com/cuda-downloads?target_os=Linux
 
-    2) Select the specifications of your Linux machine and download the installer.
+- You have to run the cuda installer: https://developer.nvidia.com/cuda-downloads?target_os=Linux
+- Select the specifications of your Linux machine and download the installer.
 
-    3) Alternatively, you can install cuda on Ubuntu with:
+Alternatively, you can install cuda on Ubuntu with:
     
 ```bash
     sudo apt-get install nvidia-cuda-toolkit
 ```
 
-    4) If you're on Linux:
+If you're on a different Linux distro with dnf instead:
 
 ```bash
     sudo dnf install nvidia-cuda-toolkit
 ```
 
-    5) Run "./installLinux.sh" and follow prompt instructions
+Run "./installLinux.sh" and follow prompt instructions
 
 MacOS: Run "./installMacOS.sh" and follow prompt instructions
 

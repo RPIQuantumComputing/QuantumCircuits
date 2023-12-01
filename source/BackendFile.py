@@ -5,10 +5,10 @@ import matplotlib.pyplot as plt
 # Check to ensure cupy support or default to numpy
 hasCupy = True
 try:
-	import cupy as np
+    import cupy as np
 except:
-	import numpy as np
-	hasCupy = False
+	  import numpy as np
+	  hasCupy = False
 
 # Various Imports
 import matplotlib.cm as cm
@@ -89,6 +89,60 @@ def makeCircuit(qc, gate_sequence):
     return qc
     
 
+def get_api_key():
+    root = tk.Tk()
+    root.withdraw()  # Hide the main window
+    api_key = simpledialog.askstring("API Key Request", "Please enter your API key:")
+    return api_key
+
+def getGrid(grid, gridWidth, gridHeight):
+    circuitOperators = [['-' for j in range(gridHeight)] for i in range(gridWidth)]
+    for widthIdx in range(gridWidth):
+        for heightIdx in range(gridHeight):
+            name = grid[widthIdx][heightIdx].getName()
+            if('CNOT' in name or 'CX' in name):
+                print("Setting")
+                circuitOperators[widthIdx][heightIdx+1] = "*"
+            if(name != '-'):
+                circuitOperators[widthIdx][heightIdx] = name
+    return circuitOperators
+
+def getInstructions(object_grid, gridWidth, gridHeight):
+    grid = getGrid(object_grid, gridWidth, gridHeight)
+    node = ParseCircuit.parse(grid)
+    return ParseCircuit.get_instructions(node)
+
+def makeCircuit(qc, gate_sequence):
+    # Iterate through the gate sequence and add gates to the circuit
+    for gate, qubit_dict in gate_sequence:
+        # The qubits on which the gate acts
+        qubits = list(qubit_dict.keys())
+        if gate == 'H':
+            # Hadamard gate
+            qc.h(qubits[0])
+        elif gate.startswith('X'):
+            # Pauli-X gate (with optional rotation angle)
+            angle = gate.split('(')[1].split(')')[0] if '(' in gate else None
+            angle = float(angle) if angle else None
+            qc.rx(angle, qubits[0]) if angle else qc.x(qubits[0])
+        elif gate.startswith('Y'):
+            # Pauli-Y gate (with optional rotation angle)
+            angle = gate.split('(')[1].split(')')[0] if '(' in gate else None
+            angle = float(angle) if angle else None
+            qc.ry(angle, qubits[0]) if angle else qc.y(qubits[0])
+        elif gate.startswith('Z'):
+            # Pauli-Y gate (with optional rotation angle)
+            angle = gate.split('(')[1].split(')')[0] if '(' in gate else None
+            angle = float(angle) if angle else None
+            qc.rz(angle, qubits[0]) if angle else qc.z(qubits[0])
+        elif gate == 'T':
+            # T gate
+            qc.t(qubits[0])
+        elif gate == 'CX':
+            # Controlled-X (CNOT) gate
+            qc.cx(qubits[1], qubits[0])  # Control qubit, Target qubit
+    return qc
+    
 class HamiltonionBackend:
     provider = "Local"
     settings = None
@@ -156,7 +210,6 @@ class HamiltonionBackend:
 
         self.plot_graph(xVal, yVal, phases)
         
-
 class FeynmanBackend:
     provider = "Local"
     settings = None
@@ -290,7 +343,7 @@ class DWaveBackend:
     def __init__(self, newSettings):
         self.settings = newSettings
         self.API_Token = "NONE"  # It's better to set default values in __init__
-    
+
     def sendAPIToken(self, api_string):
         self.API_Token = api_string
     
@@ -304,7 +357,6 @@ class DWaveBackend:
         self.histogramResult = plt.hist(energies, bins='auto')
         plt.xlabel("Minimum Energy of Solutions")
         plt.ylabel("Number of Occurrences")
-
         plt.clf()
 
 
