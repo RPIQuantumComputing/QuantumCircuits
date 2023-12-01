@@ -1132,9 +1132,11 @@ class Window(QMainWindow):
         readout_error.toggled.connect(self.TypeOnClicked)
         readout_error.callsign = "readout_error"
 
+        # To add more backends, go to https://docs.quantum.ibm.com/api/qiskit/providers_fake_provider and add the name and number of qubits the backend has
+        # The current backends were chosen arbitrarily
         fake_provider_label = QLabel("Noise Model")
-        fake_provider_qubits = {"Toronto": 27, "Vigo": 5, "Almaden": 100, "Boeblingen": 100, "Brooklyn": 100, "Cairo": 27, 
-                                "Rueschlikon": 16, "Singapore": 100, "Nairobi": 7}
+        fake_provider_qubits = {"Toronto": 27, "Vigo": 5, "Almaden": 100, "Boeblingen": 100, "Oslo": 7, "Cairo": 27, 
+                                "Rueschlikon": 16, "Singapore": 100, "Nairobi": 7, "Prague": 33}
         fake_provider_selection = []
         for i in fake_provider_qubits.keys():
             if fake_provider_qubits[i] >= currentHeight:
@@ -1149,12 +1151,18 @@ class Window(QMainWindow):
             layout.addWidget(is_noise_enabled)
             layout.addWidget(fake_provider_label)
             layout.addWidget(self.fake_provider_box)
+
+        if (designer.settings.backend == "FeynmanSimulation"):
+            layout.addWidget(is_noise_enabled)
+            layout.addWidget(fake_provider_label)
+            layout.addWidget(self.fake_provider_box)
             
         if (designer.settings.backend == "Qiskit"):
             layout.addWidget(is_noise_enabled)
             layout.addWidget(gate_error)
             layout.addWidget(readout_error)
 
+            # i dont know why but when i try to move these widgets up with the other declarations the box appears above the title  
             temperature = QSpinBox(self.NoiseSettings)
             temperature.setValue(0)
             temperature.callsign = "temperature"

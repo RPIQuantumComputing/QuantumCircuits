@@ -30,7 +30,7 @@ from qiskit.tools.visualization import plot_histogram, plot_state_city
 from qiskit_aer.library.save_instructions import save_statevector
 import qiskit.quantum_info as qi
 from qiskit_aer.noise import NoiseModel
-from qiskit.test.mock import FakeToronto, FakeVigo, FakeAlmaden, FakeBoeblingen, FakeBrooklyn, FakeCairo, FakeRueschlikon, FakeSingapore, FakeNairobi
+from qiskit.test.mock import *
 from qiskit_aer import AerSimulator
 
 class HamiltonianBackend:
@@ -106,12 +106,12 @@ class HamiltonianBackend:
                 if(probability > 0):
                     result.append([bin_str[entry], probability, phase])
             return result
-        
         # Save results
+
+        # get ideal or noisy backend
         simulator = Aer.get_backend('aer_simulator')
         if (self.settings.isNoiseEnabled):
             device_backend = getattr(qiskit.providers.fake_provider, "Fake" + self.settings.fake_provider)()
-            device_backend
             simulator = AerSimulator.from_backend(device_backend)
         circ = transpile(circuit, simulator)
         result = simulator.run(circ).result()
@@ -132,7 +132,6 @@ class HamiltonianBackend:
             
         else:
             # Run and get statevector
-            #result = simulator.run(circ).result()
             sv = result.get_statevector(circ)
             sv = np.array(sv)
             results = getAllPossibilities(sv, numQubits)
@@ -226,7 +225,14 @@ class FeynmanBackend:
                         heightIdx += 1
         circuit.measure_all()
         # Save results
-        simulator = Aer.get_backend('aer_simulator_density_matrix')
+
+        # get ideal or noisy backend
+        if (self.settings.isNoiseEnabled):
+            backend = getattr(qiskit.providers.fake_provider, "Fake" + self.settings.fake_provider)()
+            simulator = AerSimulator.from_backend(backend)
+        else:
+            simulator = Aer.get_backend('aer_simulator_density_matrix')
+
         self.results = simulator.run(circuit).result().get_counts(circuit)
         fig = plt.figure(figsize = (20, 5))
         xVal = []
@@ -614,9 +620,9 @@ class QiskitBackend:
                         heightIdx += 1
         circuit.measure_all()
 
+        # Noisy simulation
         if (self.settings.isNoiseEnabled):
             device_backend = FakeVigo()
-            #coupling_map = device_backend.configuration().coupling_map
             noise_model = NoiseModel.from_backend(device_backend,
                                               gate_error=self.settings.gate_error,
                                               readout_error=self.settings.readout_error,
@@ -626,7 +632,6 @@ class QiskitBackend:
             
             # Noise model measuring
             simulator = Aer.get_backend('aer_simulator')
-            #basis_gates = noise_model.basis_gates
             result_noise = execute(circuit, simulator, noise_model=noise_model, shots=self.settings.shots).result()
             counts_noise = result_noise.get_counts(circuit)
 
@@ -642,6 +647,8 @@ class QiskitBackend:
             plt.bar_label(bars)
             self.histogramResult = plt
             self.results = result_noise
+
+        # Ideal simulation
         else:
             # This time, use the QaSM provider
             from qiskit import IBMQ
