@@ -1,0 +1,429 @@
+from PyQt5 import QtCore, QtGui, QtWidgets
+
+import sys
+from typing import Any
+import numpy as np
+import webbrowser
+import os
+
+from pyscf import gto, scf
+
+from openfermion.transforms import jordan_wigner
+from openfermion.utils import load_operator
+
+from quri_parts.pyscf.mol import get_spin_mo_integrals_from_mole
+from quri_parts.chem.mol import ActiveSpace
+from quri_parts.openfermion.mol import get_qubit_mapped_hamiltonian
+from quri_parts.openfermion.mol import get_fermionic_hamiltonian
+from quri_parts.qulacs.estimator import create_qulacs_vector_estimator
+from quri_parts.qulacs.estimator import create_qulacs_vector_concurrent_parametric_estimator
+from quri_parts.algo.ansatz import HardwareEfficientReal
+from quri_parts.algo.optimizer import Adam, OptimizerStatus
+from quri_parts.circuit import LinearMappedUnboundParametricQuantumCircuit
+from quri_parts.core.estimator import create_parametric_estimator
+from quri_parts.core.estimator.gradient import parameter_shift_gradient_estimates
+from quri_parts.core.measurement import bitwise_commuting_pauli_measurement
+from quri_parts.core.sampling.shots_allocator import create_equipartition_shots_allocator
+from quri_parts.core.state import ParametricCircuitQuantumState, ComputationalBasisState
+from quri_parts.openfermion.operator import operator_from_openfermion_op
+
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+# from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+import matplotlib.pyplot as plt
+
+#this is used to gather the properties of each element in the molecule
+import mendeleev
+from mendeleev import element
+
+#plotly used for the 3d modeling
+import plotly
+import plotly.express as px
+import plotly.graph_objects as go
+import plotly.io as pio
+
+#run export DISPLAY=:0.0
+
+costs = []
+
+# This is basically QuriPart's competition code with adjustments, will change to my competition code later
+# right now, though, I don't want to add a few dependencies and mess up the docker container
+def cost_fn(hamiltonian, parametric_state, param_values, estimator):
+    estimate = estimator(
+        hamiltonian,
+        parametric_state,
+        [param_values]
+    )
+    return estimate[0].value.real
+
+def vqe(hamiltonian, parametric_state, estimator, init_params, optimizer):
+    opt_state = optimizer.get_init_state(init_params)
+
+    def c_fn(param_values):
+        return cost_fn(hamiltonian,
+                       parametric_state,
+                       param_values,
+                       estimator)
+
+    def g_fn(param_values):
+        grad = parameter_shift_gradient_estimates(
+            hamiltonian,
+            parametric_state,
+            param_values,
+            estimator
+        )
+        return np.asarray([i.real for i in grad.values])
+
+    print("\n" + '-' * 80)
+    while True:
+        opt_state = optimizer.step(opt_state, c_fn, g_fn)
+        print(f"ITERATION {opt_state.niter:<5} COST: {opt_state.cost}")
+
+        global costs
+        costs.append(opt_state.cost)
+
+        if opt_state.status == OptimizerStatus.FAILED:
+            print("\nOPTIMIZER STATUS:       FAILED")
+            break
+        elif opt_state.status == OptimizerStatus.CONVERGED:
+            print("\nOPTIMIZER STATUS:       CONVERGED")
+            break
+    return opt_state
+
+class RunAlgorithm:
+    def __init__(self) -> None:
+        pass
+
+    def result_for_evaluation(self) -> tuple[Any, float]:
+        energy_final = self.get_result()
+        return energy_final
+
+    def get_result(self, ham, electrons, orbitals) -> Any:
+        import openfermion
+        n_qubits = max(electrons, orbitals)*2
+        hamiltonian = ham
+
+        # make hf + HEreal ansatz
+        hf_circuit = LinearMappedUnboundParametricQuantumCircuit(n_qubits)
+        hw_ansatz = HardwareEfficientReal(qubit_count=n_qubits, reps=4)
+        hf_circuit.extend(hw_ansatz)
+
+        parametric_state = ParametricCircuitQuantumState(n_qubits, hf_circuit)
+
+        sampling_estimator = create_qulacs_vector_concurrent_parametric_estimator()
+        adam_optimizer = Adam(ftol=10e-5)
+
+        init_param = np.random.rand(hw_ansatz.parameter_count) * 2 * np.pi * 0.001
+
+        result = vqe(
+            hamiltonian,
+            parametric_state,
+            sampling_estimator,
+            init_param,
+            adam_optimizer,
+        )
+        print(f"TOTAL ITERATIONS:       {result.niter}")
+        return result.cost
+
+# The simulation method heavily uses https://quri-parts.qunasys.com/tutorials/quantum_chemistry/mo_eint_and_hamiltonial's
+# Example code
+
+class Ui_QuantumSimulationGUI(object):
+    user_mol = None
+    user_mo_coeff=None
+    active_space = None
+    active_space_mo_eint_set = None
+
+    #initializes the user interface
+    def setupUi(self, QuantumSimulationGUI):
+        QuantumSimulationGUI.setObjectName("QuantumSimulationGUI")
+        self.centralwidget = QtWidgets.QWidget(QuantumSimulationGUI)
+
+        #left side of the GUI layout
+        left_layout = QtWidgets.QVBoxLayout()
+
+        #text field to enter molecule
+        self.textField = QtWidgets.QTextEdit()
+        left_layout.addWidget(self.textField)
+
+        #button to compute the electronic integrals
+        self.pushButton = QtWidgets.QPushButton("Compute Electronic Integrals")
+        self.pushButton.clicked.connect(self.on_compute_integrals_clicked)
+        left_layout.addWidget(self.pushButton)
+
+        #label for the electron and orbitals inpute fields
+        self.label_3 = QtWidgets.QLabel("Step 2: Specify the number of orbitals and electrons")
+        left_layout.addWidget(self.label_3)
+
+        #orbital input field
+        self.orbitalBox = QtWidgets.QSpinBox()
+        left_layout.addWidget(self.orbitalBox)
+
+        #electron input field
+        self.electronBox = QtWidgets.QSpinBox()
+        left_layout.addWidget(self.electronBox)
+
+        #right side of the GUI layout
+        right_layout = QtWidgets.QVBoxLayout()
+        right_layout.setSpacing(0)
+
+        #ComboBox for mapping selection
+        mappings = ["SELECT MAPPING", "Jordan-Wigner", "Bravyi-Kitaev", "Symmetric Bravyi-Kitaev"]
+        self.mappingComboBox = QtWidgets.QComboBox()
+
+        self.mappingComboBox.addItems(mappings) #intialize values of the mapping box
+        self.mappingComboBox.setCurrentIndex(0)  #intialize the default to the first mapping
+        self.mappingComboBox.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+
+        right_layout.addWidget(self.mappingComboBox)
+
+        #ComboxBox for preset molecules
+        presets = ["OPTIONAL PRESET", "Water", "Calcium Oxide", "Ozone", "Sodium Chloride", "Carbon Dioxide"]
+        self.presetComboBox = QtWidgets.QComboBox()
+
+        self.presetComboBox.currentIndexChanged.connect(self.on_preset_select)
+
+        self.presetComboBox.addItems(presets)
+        self.presetComboBox.setCurrentIndex(0)  #intialize the default to the first preset
+        self.presetComboBox.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+
+        right_layout.addWidget(self.presetComboBox)
+
+        #initialize the simulate button
+        self.Simulate = QtWidgets.QPushButton("Simulate")
+        right_layout.addWidget(self.Simulate)
+        self.Simulate.clicked.connect(self.on_simulate_clicked)
+
+        #combine left and right layouts into the main_layout
+        main_layout = QtWidgets.QHBoxLayout()
+        main_layout.addLayout(left_layout)
+        main_layout.addLayout(right_layout)
+
+        #add the VQE graph to the interface
+        self.figure = plt.figure()
+        self.canvas = FigureCanvas(self.figure)
+        right_layout.addWidget(self.canvas)
+
+        #format the various layouts
+        self.centralwidget.setLayout(main_layout) #set the central layout to the main_layout
+        QuantumSimulationGUI.setCentralWidget(self.centralwidget)
+
+        self.menubar = QtWidgets.QMenuBar(QuantumSimulationGUI) #add menubar
+        QuantumSimulationGUI.setMenuBar(self.menubar)
+
+        self.statusbar = QtWidgets.QStatusBar(QuantumSimulationGUI) #add statusbar
+        QuantumSimulationGUI.setStatusBar(self.statusbar)
+
+        self.retranslateUi(QuantumSimulationGUI)
+        QtCore.QMetaObject.connectSlotsByName(QuantumSimulationGUI)
+
+    def retranslateUi(self, QuantumSimulationGUI):
+        _translate = QtCore.QCoreApplication.translate
+        QuantumSimulationGUI.setWindowTitle(_translate("QuantumSimulationGUI", "MainWindow"))
+
+    def drawSphere(self, position, radius, resolution=20):
+        #source :https://stackoverflow.com/questions/70977042/how-to-plot-spheres-in-3d-with-plotly-or-another-library
+        x, y, z = position
+
+        u, v = np.mgrid[0:2*np.pi:resolution*2j, 0:np.pi:resolution*1j]
+
+        X = radius * np.cos(u)*np.sin(v) + x
+        Y = radius * np.sin(u)*np.sin(v) + y
+        Z = radius * np.cos(v) + z
+
+        #print(f"\tSphere drawn at positon {x}, {y}, {z}")
+        return (X, Y, Z)
+
+    def drawBond(self, pos1, pos2):
+        x1, y1, z1 = pos1
+        x2, y2, z2 = pos2
+
+        X = np.array([x1, x2])
+        Y = np.array([y1, y2])
+        Z = np.array([z1, z2])
+
+        return (X, Y, Z)
+
+    def generate3dMolecule(self, molecule):
+        data = []
+        print( '\n' + ('-' * 80) + "\nParsing atoms...\n", flush=True)
+
+        symbols = []
+        positions = []
+        radii = []
+
+        for atom in molecule:
+            #seperate into element and position
+            symbol = atom[0]
+            pos = atom[1]
+
+            #find the atomic radius of the element
+            r = element(symbol).atomic_radius
+
+            #append values to lists
+            symbols.append(symbol)
+            positions.append(pos)
+            radii.append(r)
+
+        maxRadius = max(radii)
+
+        #draw the atoms
+        for i in range(len(symbols)):
+            symbol = symbols[i]
+            pos = positions[i]
+            r = radii[i]/maxRadius
+
+            x, y, z = pos
+            print(f"\t - {symbol}, position: ({x}, {y}, {z}), radius: {r}", flush=True)
+
+            (x_pns_surface, y_pns_surface, z_pns_suraface) = self.drawSphere(pos, r)
+            data.append(go.Surface(x=x_pns_surface,
+                                   y=y_pns_surface,
+                                   z=z_pns_suraface,
+                                   opacity=1.0,
+                                   colorscale = 'reds'))
+
+        fig = go.Figure(data=data)
+
+        #remove the color scale from the 3d model
+        fig.update_traces(showscale=False)
+
+        #draw the bonds between atoms
+        for i in range(1, len(symbols)):
+            pos1 = positions[i-1]
+            pos2 = positions[i]
+
+            x_bnd, y_bnd, z_bnd = self.drawBond(pos1, pos2)
+
+            fig.add_scatter3d(x=x_bnd, y=y_bnd, z=z_bnd, mode='lines', line_width=25, line_color='black')
+
+        print("\nGENERATING 3D MODEL...\n" + ('-' * 80), flush=True)
+
+        #remove the grid of the 3d model
+        fig.update_layout(
+            scene = dict(
+                xaxis = dict(visible=False),
+                yaxis = dict(visible=False),
+                zaxis = dict(visible=False)
+            ),
+
+            showlegend=False
+        )
+
+        #fig.show()
+        fig.write_html("Visualization.html")
+        import subprocess
+        subprocess.run(['firefox', 'file://' + os.path.realpath("Visualiztion.html")])
+
+    def parseLine(self, line):
+        #line format: <element symbol> (x, y, z)
+        divided = line.split("(")
+
+        if(len(divided) == 1):
+            return None
+
+        element = divided[0][:-1]
+        position = [int(component) for component in ((divided[1][:-1]).split(","))]
+
+        #print(f"element: {element},     position: {position}", flush=True)
+
+        return [element, position]
+
+    def on_compute_integrals_clicked(self):
+        elements = []
+        user_input = self.textField.toPlainText()
+        lines = user_input.split("\n")
+
+        for line in lines:
+                parsed = self.parseLine(line)
+
+                if(parsed != None):
+                    elements.append(parsed)
+
+        #make a 3d model of the molecule
+        self.generate3dMolecule(elements)
+
+        try:
+
+            # Guassian-Type Molecule, M defines a molecule object
+            self.user_mol = gto.M(atom=elements, verbose=0)
+            # This will run a self-consistent field (iterative electronic structure until stabalization is found)
+            # This is using restricted Hatree-Fock, molecular orbitrals occupied by 2 electrons with a pairing constraint (i.e. stable molecules)
+            mol_mf = scf.RHF(self.user_mol).run()
+            # Get the coefficients describing the molecular orbital function
+            # Thi implicitly gives a superposition of the atomic orbitals
+            self.user_mo_coeff = mol_mf.mo_coeff
+            # Now, we need to compute the electron integrals
+            self.full_space, self.mo_eint_set = get_spin_mo_integrals_from_mole(self.user_mol, self.user_mo_coeff)
+        except:
+            print("Error: Material is not physically stable!")
+
+    def on_simulate_clicked(self):
+        try:
+            # Compute the Active Space
+            self.number_of_orbitals = int(self.orbitalBox.value())
+            self.number_of_electrons = int(self.electronBox.value())
+            self.active_space, self.active_space_mo_eint_set = get_spin_mo_integrals_from_mole(
+                self.user_mol,
+                self.user_mo_coeff,
+                ActiveSpace(self.number_of_electrons, self.number_of_orbitals)
+            )
+            # Implicitly, the active space is cutting down the ansatz to only consider a smaller problem space
+            # Consider the active molecular problem and then the reduced one
+            active_space_jw_hamiltonian, active_space_operator_mapper, active_space_state_mapper = get_qubit_mapped_hamiltonian(
+                self.active_space,
+                self.active_space_mo_eint_set
+            )
+            # Let us perform the simulation!
+            algo_run = RunAlgorithm()
+            print("FINAL ENERGY ESTIMATE: {} eV\n{}".format(
+                algo_run.get_result(
+                    active_space_jw_hamiltonian,
+                    self.number_of_electrons,
+                    self.number_of_orbitals
+                ), ('-' * 80)))
+
+            # clear the figure
+            self.figure.clear()
+
+            #add the axes
+            ax = self.figure.add_subplot(111)
+            ax.set_xlabel("Iteration of VQE")
+            ax.set_ylabel("Energy Evaluation (eV)")
+
+            # plot data
+            global costs
+
+            ax.plot(costs, '*-')
+            self.canvas.draw()
+        except:
+            print("Error: Invalid Electron/Orbital Configuration or Structure!")
+
+    def on_preset_select(self):
+
+        presets = [
+            ("DEFAULT", -1, -1),
+            ("H (0,0,0)\nO (2,0,1)\nH (0,0,2)", 4, 6), # Water
+            ("Ca (0,0,0)\nO (0,0,1)", 4, 6),            # Calcium Oxide
+            ("O (0,0,0)\nO (2,0,1)\nH (0,0,2)", 4, 6), # Ozone
+            ("Na (0,0,0)\nO (0,0,1)", 4, 6),            # Sodium Chloride
+            ("O (0,0,0)\nC (2,0,1)\nO (0,0,2)", 4, 6)  # Carbon Dioxide
+        ]
+
+        selected_index = self.presetComboBox.currentIndex()
+        selected_preset = presets[selected_index]
+
+        (molecule, orbitals, electrons) = selected_preset
+
+        #load the preset values into their respective fields
+        self.textField.setPlainText(molecule)
+        self.orbitalBox.setValue(orbitals)
+        self.electronBox.setValue(electrons)
+
+if __name__ == "__main__":
+    import sys
+    app = QtWidgets.QApplication(sys.argv)
+    QuantumSimulationGUI = QtWidgets.QMainWindow()
+    ui = Ui_QuantumSimulationGUI()
+    ui.setupUi(QuantumSimulationGUI)
+    QuantumSimulationGUI.show()
+    sys.exit(app.exec_())

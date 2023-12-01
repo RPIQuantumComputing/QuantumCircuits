@@ -1,0 +1,376 @@
+import sys
+from PyQt5.QtWidgets import (QApplication, QWidget, QPushButton, QLabel, QLineEdit, QGridLayout, QHBoxLayout, QVBoxLayout)
+
+end_grid = [[0 for i in range(4)] for j in range(4)]
+import tkinter as tk
+from tkinter import simpledialog
+
+from qiskit_nature.second_q.operators.spin_op import SpinOp
+import numpy as np
+from qiskit_ibm_runtime import QiskitRuntimeService
+from qiskit.opflow import PauliSumOp
+from qiskit.quantum_info import Pauli
+import numpy as np
+# General imports
+import time
+import numpy as np
+from qiskit.opflow import PauliSumOp, Z, I
+from qiskit.algorithms import VQE, NumPyMinimumEigensolver
+import qiskit
+# Pre-defined ansatz circuit and operator class for Hamiltonian
+from qiskit.circuit.library import EfficientSU2
+from qiskit.quantum_info import SparsePauliOp
+
+# The IBM Qiskit Runtime
+from qiskit_ibm_runtime import QiskitRuntimeService
+from qiskit_ibm_runtime import Estimator, Session
+from qiskit.algorithms.optimizers import COBYLA
+
+# SciPy minimizer routine
+from scipy.optimize import minimize
+
+from qiskit_ibm_runtime import QiskitRuntimeService, Session, Sampler, Estimator, Options
+
+# Plotting functions
+import matplotlib.pyplot as plt
+import pennylane as qml
+from matplotlib import pyplot as plt
+import numpy as np
+from numpy import array
+import scipy
+from scipy.optimize import minimize
+import networkx as nx
+import seaborn
+import itertools
+
+from qiskit import Aer, IBMQ
+from qiskit.providers.aer import AerSimulator
+from qiskit.providers.aer.noise import NoiseModel
+from qiskit.utils import QuantumInstance
+from qiskit.algorithms import VQE
+from qiskit.circuit.library import EfficientSU2
+from qiskit.algorithms.optimizers import QNSPSA
+from qiskit.opflow import ExpectationFactory
+import matplotlib.pyplot as plt
+import numpy as np
+
+from qiskit_nature.second_q.mappers import LogarithmicMapper
+from qiskit.algorithms.eigensolvers import VQD
+import threading
+
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+
+mapper = LogarithmicMapper()
+
+np.random.seed(42)
+
+from PyQt5.QtWidgets import QDialog, QVBoxLayout
+
+class CircuitWindow(QDialog):
+    def __init__(self, parent=None):
+        super(CircuitWindow, self).__init__(parent)
+        self.initUI()
+
+    def initUI(self):
+        self.layout = QVBoxLayout(self)
+        self.setLayout(self.layout)
+        self.setWindowTitle("Quantum Circuit")
+
+    def addCanvas(self, canvas):
+        self.layout.addWidget(canvas)
+
+def find_neighbors(point, dims):
+    neighbors = []
+    look_at = [1,0,-1]
+    for dx in look_at:
+        for dy in look_at:
+            if(not (dx + point[0] >= dims[0] or dx + point[0] < 0)
+                and not (dy + point[1] >= dims[1] or dy + point[1] < 0) and
+                  not (dx == 0 and dy == 0) and
+                  not (dx*dx + dy*dy > 1)):
+                neighbors.append([dx+point[0], point[1]+dy])
+    return neighbors
+
+def find_next_neighbors(point, dims):
+    neighbors = find_neighbors(point, dims)
+    set_of_neighbors = []
+    for item in neighbors:
+        neighbor_set = find_neighbors(item, dims)
+        set_of_neighbors += neighbor_set
+    set_of_neighbors = sorted(set_of_neighbors)
+    set_of_neighbors = [set_of_neighbors[i] for i in range(len(set_of_neighbors)) if i == 0 or set_of_neighbors[i] != set_of_neighbors[i-1]]
+    return [item for item in set_of_neighbors if item != point]
+
+def allignment(point, limit, dim, spin_number, field):
+    idx = point[1]*dim[1] + point[0]
+    op = SpinOp({"X_" + str(idx): field[0], 
+                 "Y_" + str(idx): field[1], 
+                 "Z_" + str(idx): field[2]})
+    return op
+
+def get_api_key():
+    root = tk.Tk()
+    root.withdraw()  # Hide the main window
+    api_key = simpledialog.askstring("API Key Request", "Please enter your API key:")
+    return api_key
+
+all_values = []
+step = 1
+
+def callback(eval_count, params, mean, std):
+    # This callback function will store the value at each optimization step
+    all_values.append(mean)
+    global step
+    print("Step: ", step, " Evaluation: ", mean)
+    step += 1
+    # If eval_count is a multiple of 10, store the mean of the last 10 values
+    if eval_count % 10 == 0:
+        avg_last_10 = np.mean(all_values[-10:])  # Edit this line to get real average across timesteps
+        values.append(avg_last_10)
+
+def square_hamiltonian(u, v, spins, dim, spin_number, field):
+    starter = None
+    for x in range(dim[0]):
+        for y in range(dim[1]):
+            point = [x,y]
+            spin_num = spins[x][y]
+            neighbors = find_neighbors(point, dim)
+            next_neighbors = find_next_neighbors(point, dim)
+            idx = point[1]*dim[1] + point[0]
+
+            if(starter == None):
+                starter = allignment(point, spin_num, dim, spin_number, field)
+            else:
+                starter += allignment(point, spin_num, dim, spin_number, field)
+
+            for neighbor in neighbors:
+                idx_n = neighbor[1]*dim[1] + neighbor[0]
+                spin_num_n = spins[neighbor[0]][neighbor[1]]
+                starter += u * SpinOp({"X_" + str(idx_n) + " X_" + str(idx): 1})
+                starter += u * SpinOp({"Y_" + str(idx_n) + " Y_" + str(idx): 1})
+                starter += u * SpinOp({"Z_" + str(idx_n) + " Z_" + str(idx): 1})
+            
+            for neighbor in next_neighbors:
+                idx_n = neighbor[1]*dim[1] + neighbor[0]
+                spin_num_n = spins[neighbor[0]][neighbor[1]]
+                starter += v * SpinOp({"X_" + str(idx_n) + " X_" + str(idx): 1})
+                starter += v * SpinOp({"Y_" + str(idx_n) + " Y_" + str(idx): 1})
+                starter += v * SpinOp({"Z_" + str(idx_n) + " Z_" + str(idx): 1})
+            
+    return starter
+
+def get_dot_product(pointA, pointB, spin_num, dim):
+    return SpinOp({
+                    "X_" + str((pointA[1] * dim[0]) + pointA[0]) + " " + "X_" + str((pointB[1] * dim[0]) + pointB[0]): 1,
+                    "Y_" + str((pointA[1] * dim[0]) + pointA[0]) + " " + "Y_" + str((pointB[1] * dim[0]) + pointB[0]): 1,
+                    "Z_" + str((pointA[1] * dim[0]) + pointA[0]) + " " + "Z_" + str((pointB[1] * dim[0]) + pointB[0]): 1,
+                  }
+                 )
+    
+def neal_order(spins, dim, spin_number, field):
+    starter = None
+    for x1 in range(dim[0]+1):
+        for y1 in range(dim[1]+1):
+            for x2 in range(dim[0]+1):
+                for y2 in range(dim[1]+1):
+                    if(x1 >= dim[0]):
+                        x1 = 0
+                    if(x2 >= dim[0]):
+                        x2 = 0
+                    if(y1 >= dim[1]):
+                        y1 = 0
+                    if(y2 >= dim[1]):
+                        y2 = 0
+                    if(not(x1 == x2 and y1 == y2)):
+                        factor = (-1)**(x1 - x2) * (-1)**(y1 - y2)
+                        if(starter == None):
+                            starter = factor * get_dot_product([x1, y1], [x2, y2], spin_number, dim)
+                        else:
+                            starter += factor * get_dot_product([x1, y1], [x2, y2], spin_number, dim)
+    return starter / (dim[0] * dim[1])**2
+
+def dimer_order(spins, dim, spin_number, field):
+    starter = None
+    for x1 in range(dim[0]-1):
+        for y1 in range(dim[1]):
+            x2, y2 = x1 + 1 if x1 < dim[0] else 0, y1
+            factor = (-1)**(x2)
+            if(starter == None):
+                starter = factor * get_dot_product([x1, y1], [x2, y2], spin_number, dim)
+            else:
+                starter += factor * get_dot_product([x1, y1], [x2, y2], spin_number, dim)
+    return starter / (dim[0] * (dim[0] - 1))**2
+
+def count_number_spins(spins):
+    total = 0
+    for x in spins:
+        for y in x:
+            total += (2*y) + 1
+    return int(total/2)
+
+class SpinGrid(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.initUI()
+
+    def initUI(self):
+        # Main horizontal layout
+        mainLayout = QHBoxLayout()
+
+        # Left side layout (for grid and spin controls)
+        leftLayout = QVBoxLayout()
+        gridLayout = QGridLayout()
+
+        # Creating a 10x10 grid as an example
+        self.gridLabels = [[QLabel('0', self) for _ in range(6)] for _ in range(6)]
+        for i, row in enumerate(self.gridLabels):
+            for j, label in enumerate(row):
+                label.setStyleSheet("border: 1px solid black; min-width: 20px; min-height: 20px; text-align: center;")
+                gridLayout.addWidget(label, i, j)
+
+        # Grid controls
+        xLabel = QLabel("X Position:")
+        self.xInput = QLineEdit()
+        yLabel = QLabel("Y Position:")
+        self.yInput = QLineEdit()
+        spinLabel = QLabel("Spin Number:")
+        self.spinInput = QLineEdit()
+        self.addSpinBtn = QPushButton("Add Spin")
+        self.addSpinBtn.clicked.connect(self.addSpin)
+
+        # Add the grid and controls to the left layout
+        leftLayout.addLayout(gridLayout)
+        leftLayout.addWidget(xLabel)
+        leftLayout.addWidget(self.xInput)
+        leftLayout.addWidget(yLabel)
+        leftLayout.addWidget(self.yInput)
+        leftLayout.addWidget(spinLabel)
+        leftLayout.addWidget(self.spinInput)
+        leftLayout.addWidget(self.addSpinBtn)
+
+        # Right side layout (for simulation parameters and controls)
+        rightLayout = QVBoxLayout()
+        fieldX = QLabel("Field X:")
+        self.fieldXInput = QLineEdit()
+        fieldY = QLabel("Field Y:")
+        self.fieldYInput = QLineEdit()
+        fieldZ = QLabel("Field Z:")
+        self.fieldZInput = QLineEdit()
+        nearestNeighborLabel = QLabel("Nearest Neighbor Interaction Strength:")
+        self.nearestNeighborInput = QLineEdit()
+        nextNearestLabel = QLabel("Next Nearest Interaction Strength:")
+        self.nextNearestInput = QLineEdit()
+        self.simulateBtn = QPushButton("Simulate")
+        self.simulateBtn.clicked.connect(self.callthread_simulate)
+        self.displayCircuitBtn = QPushButton("Display Circuit")
+        self.displayCircuitBtn.clicked.connect(self.displayCircuit)
+
+        # Add the parameter controls to the right layout
+        rightLayout.addWidget(fieldX)
+        rightLayout.addWidget(self.fieldXInput)
+        rightLayout.addWidget(fieldY)
+        rightLayout.addWidget(self.fieldYInput)
+        rightLayout.addWidget(fieldZ)
+        rightLayout.addWidget(self.fieldZInput)
+        rightLayout.addWidget(nearestNeighborLabel)
+        rightLayout.addWidget(self.nearestNeighborInput)
+        rightLayout.addWidget(nextNearestLabel)
+        rightLayout.addWidget(self.nextNearestInput)
+        rightLayout.addWidget(self.simulateBtn)
+        rightLayout.addWidget(self.displayCircuitBtn)
+
+        # Add left and right layouts to main layout
+        mainLayout.addLayout(leftLayout)
+        mainLayout.addLayout(rightLayout)
+
+        # Set the window's main layout
+        self.setLayout(mainLayout)
+        self.setWindowTitle('Quantum Spin-N/2 Configurator J1-J2 Heisenberg Model Square Lattice')
+
+    def addSpin(self):
+        x = self.xInput.text()
+        y = self.yInput.text()
+        spin = self.spinInput.text()
+        if x.isdigit() and y.isdigit() and len(spin) >= 1:
+            x = int(x)
+            y = int(y)
+            spin = float(spin)
+            if 0 <= x < 6 and 0 <= y < 6:
+                global end_grid
+                end_grid[y][x] = spin
+                self.gridLabels[y][x].setText(str(spin))
+                print(f"Added spin {spin} at position ({x}, {y})")
+            else:
+                print("X and Y positions must be within the grid range.")
+        else:
+            print("Please enter numeric values for X, Y, and Spin.")
+
+    # Placeholder functions for simulate and display circuit actions
+    def simulate(self):
+        dim = [4,4]
+        global end_grid
+        spins = end_grid
+        u = float(self.nearestNeighborInput.text())
+        v = float(self.nextNearestInput.text())
+        field = [float(self.fieldXInput.text()), float(self.fieldYInput.text()), float(self.fieldZInput.text())]
+        spin_num = count_number_spins(spins)
+        end_operator = (square_hamiltonian(u, v, spins, dim, spin_num, field))
+        neal_order_op = neal_order(spins, dim, spin_num, field)
+        api_key = get_api_key()
+        # Replace with your IBM Quantum Experience credentials
+        IBMQ.save_account(api_key, overwrite=True)
+        IBMQ.load_account()
+
+        print(end_operator)
+
+        my_provider = IBMQ.get_provider(hub="ibm-q", group="open", project="main")
+        backend = my_provider.get_backend('simulator_mps')
+        my_provider = IBMQ.get_provider(hub="rpi", group="general", project="general")
+        device_to_mimic = my_provider.get_backend('ibm_sherbrooke')
+        noise_model = NoiseModel.from_backend(device_to_mimic)
+        quantum_instance = QuantumInstance(backend=backend, noise_model=noise_model)
+        ansatz = EfficientSU2(spin_num, reps=2)
+        optimizer = COBYLA(maxiter=50)
+        vqe = VQE(ansatz, optimizer, quantum_instance=quantum_instance, callback=callback)
+        end_operator = square_hamiltonian(u, v, spins, dim, spin_num, field)
+        neal_order_op = neal_order(spins, dim, spin_num, field)
+        dimer_order_op = dimer_order(spins, dim, spin_num, field)
+        end_operator = mapper.map(end_operator)
+        neal_order_op = mapper.map(neal_order_op)
+        dimer_order_op = mapper.map(dimer_order_op)
+        result = vqe.compute_minimum_eigenvalue(operator=end_operator, aux_operators=[neal_order_op, dimer_order_op])
+        aux_op_expectations = result.aux_operator_eigenvalues
+        if aux_op_expectations is not None:
+            neal_order_value = aux_op_expectations[0]
+            print("Neel Ordering Parameter: ", neal_order_value)
+            dimer_order_value = aux_op_expectations[1]
+            print("Dimer Ordering Parameter: ", dimer_order_value)
+
+    def callthread_simulate(self):
+        threading.Thread(target=self.simulate, args=()).start()
+
+    def displayCircuit(self):
+        global end_grid
+        spins = end_grid
+        spin_num = count_number_spins(spins)
+        ansatz = EfficientSU2(spin_num, reps=2).decompose()
+
+        fig = Figure()
+        ax = fig.add_subplot(111)
+        ansatz.draw(output='mpl', ax=ax)
+
+        canvas = FigureCanvas(fig)
+        circuitWindow = CircuitWindow(self)
+        circuitWindow.addCanvas(canvas)
+        circuitWindow.resize(800, 600)  # You can adjust the size as needed
+        circuitWindow.show()
+
+def main():
+    app = QApplication(sys.argv)
+    ex = SpinGrid()
+    ex.show()
+    sys.exit(app.exec_())
+
+if __name__ == '__main__':
+    main()
