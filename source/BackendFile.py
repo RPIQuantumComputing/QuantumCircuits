@@ -3,13 +3,8 @@ import math
 import matplotlib.pyplot as plt
 
 # Check to ensure cupy support or default to numpy
-hasCupy = True
-try:
-    import cupy as np
-except:
-	  import numpy as np
-	  hasCupy = False
-
+import numpy as np
+hasCupy = False
 # Various Imports
 import matplotlib.cm as cm
 import matplotlib as mpl
@@ -24,15 +19,12 @@ from cuquantum import CircuitToEinsum
 from qiskit_ibm_runtime import QiskitRuntimeService, Sampler
 from dwave.system import LeapHybridCQMSampler
 from strawberryfields import RemoteEngine, ops
-from ParseCircuit import ParseCircuit
+import ParseCircuit as PC
 from tkinter import simpledialog, Tk
 from qiskit import QuantumCircuit
 from qiskit import Aer, transpile
 from qiskit.compiler import transpile
 from qiskit_aer.library.save_instructions.save_statevector import save_statevector
-
-
-PC = ParseCircuit()
 
 def get_api_key():
     root = Tk()
@@ -89,61 +81,52 @@ def makeCircuit(qc, gate_sequence):
     return qc
     
 
-def get_api_key():
-    root = tk.Tk()
-    root.withdraw()  # Hide the main window
-    api_key = simpledialog.askstring("API Key Request", "Please enter your API key:")
-    return api_key
-
-def getGrid(grid, gridWidth, gridHeight):
-    circuitOperators = [['-' for j in range(gridHeight)] for i in range(gridWidth)]
-    for widthIdx in range(gridWidth):
-        for heightIdx in range(gridHeight):
-            name = grid[widthIdx][heightIdx].getName()
-            if('CNOT' in name or 'CX' in name):
-                print("Setting")
-                circuitOperators[widthIdx][heightIdx+1] = "*"
-            if(name != '-'):
-                circuitOperators[widthIdx][heightIdx] = name
-    return circuitOperators
-
-def getInstructions(object_grid, gridWidth, gridHeight):
-    grid = getGrid(object_grid, gridWidth, gridHeight)
-    node = ParseCircuit.parse(grid)
-    return ParseCircuit.get_instructions(node)
-
-def makeCircuit(qc, gate_sequence):
-    # Iterate through the gate sequence and add gates to the circuit
-    for gate, qubit_dict in gate_sequence:
-        # The qubits on which the gate acts
-        qubits = list(qubit_dict.keys())
-        if gate == 'H':
-            # Hadamard gate
-            qc.h(qubits[0])
-        elif gate.startswith('X'):
-            # Pauli-X gate (with optional rotation angle)
-            angle = gate.split('(')[1].split(')')[0] if '(' in gate else None
-            angle = float(angle) if angle else None
-            qc.rx(angle, qubits[0]) if angle else qc.x(qubits[0])
-        elif gate.startswith('Y'):
-            # Pauli-Y gate (with optional rotation angle)
-            angle = gate.split('(')[1].split(')')[0] if '(' in gate else None
-            angle = float(angle) if angle else None
-            qc.ry(angle, qubits[0]) if angle else qc.y(qubits[0])
-        elif gate.startswith('Z'):
-            # Pauli-Y gate (with optional rotation angle)
-            angle = gate.split('(')[1].split(')')[0] if '(' in gate else None
-            angle = float(angle) if angle else None
-            qc.rz(angle, qubits[0]) if angle else qc.z(qubits[0])
-        elif gate == 'T':
-            # T gate
-            qc.t(qubits[0])
-        elif gate == 'CX':
-            # Controlled-X (CNOT) gate
-            qc.cx(qubits[1], qubits[0])  # Control qubit, Target qubit
-    return qc
+class Backend:
+    results = None
     
-class HamiltonionBackend:
+    def display(self):
+        results = self.results
+        fig = plt.figure(figsize = (20, 5))
+        xVal = []
+        yVal = []
+        norm = mpl.colors.Normalize(vmin=0, vmax=np.pi)
+        cmap = cm.hsv
+        m = cm.ScalarMappable(norm=norm, cmap=cmap)
+        # Normalize to 100% (show percentages, not decimals)
+        for entry in results:
+            xVal.append(entry[0][::-1])
+            if(hasCupy):
+                yVal.append(entry[1].get()*100)
+            else:
+                yVal.append(entry[1]*100)
+        if(hasCupy):
+            phases = [m.to_rgba(np.angle(results[j][2].get() * 1j)) for j in range(len(results))]
+        else:
+            phases = [m.to_rgba(np.angle(results[j][2] * 1j)) for j in range(len(results))]
+            
+        # Values are not sorted, do your magic pandas!
+        df = pd.DataFrame(
+            dict(
+                x=xVal,
+                y=yVal,
+                phase=phases
+            )
+        )
+
+        df_sorted = df.sort_values('x')
+        # Make graph
+        plt.bar(df_sorted['x'], df_sorted['y'], width = 0.4, color = df_sorted['phase'])
+        plt.xlabel("Computational Result")
+        plt.ylabel("Probability")
+        # Empirical formula to find rotations
+        rotationAmount = math.floor(90/(1 + np.exp(-(((len(xVal))/3)-5))))
+        plt.xticks(rotation = rotationAmount)
+        cbar = plt.colorbar(m)
+        cbar.set_label('Relative Phase of State (Radians)', rotation=-90, labelpad=20)
+        plt.title("Probability Distribution of Given Quantum Circuit")
+        self.histogramResult = plt
+
+class HamiltonionBackend(Backend):
     provider = "Local"
     settings = None
     histogramResult = None
@@ -156,18 +139,28 @@ class HamiltonionBackend:
         pass  # Instance method now, fixed missing self parameter
     
     def returnProbability(self, statevector, qubitsActive):
-        projectTo = [np.array([0, 1]) if qubit else np.array([1, 0]) for qubit in qubitsActive]
-        projectTo = np.array([1]).prod(projectTo)
-        return np.dot(projectTo.conj().T, statevector)
-    
+        projectTo = np.array([1])
+        for entry in range(0, len(qubitsActive)):
+            if(qubitsActive[entry] == 1):
+                projectTo = np.kron(projectTo, np.array([0, 1]))
+            else:
+                projectTo = np.kron(projectTo, np.array([1, 0]))
+        projectTo = projectTo
+        projectTo = np.transpose(projectTo)
+        dotProduct = projectTo.dot(statevector)
+        return dotProduct
+
     def getAllPossibilities(self, statevector, qubits):
-        bin_str = [''.join(seq) for seq in itertools.product('01', repeat=qubits)]
-        possibility = np.array(list(itertools.product([0, 1], repeat=qubits)))
-        projectTo_vectorized = np.vectorize(self.returnProbability, excluded=['statevector'], signature='(n),(n)->()')
-        probabilities = projectTo_vectorized(statevector=statevector, qubitsActive=possibility)
-        probabilities = np.real(probabilities * np.conj(probabilities))
-        phases = np.angle(probabilities)
-        return [(bstr, prob, phase) for bstr, prob, phase in zip(bin_str, probabilities, phases) if prob > 0]
+        bin_str = [''.join(p) for p in itertools.product('01', repeat=qubits)]
+        possibility = [list(p) for p in itertools.product([0, 1], repeat=qubits)]
+        result = []
+        for entry in range(len(possibility)):
+            dotProduct = self.returnProbability(statevector, possibility[entry])
+            probability = np.real(dotProduct * np.conj(dotProduct))
+            phase = np.angle(dotProduct)
+            if(probability > 0):
+               result.append([bin_str[entry], probability, phase])
+        return result
 
     def plot_graph(self, xVal, yVal, phases):
         df = pd.DataFrame({'x': xVal, 'y': yVal, 'phase': phases})
@@ -210,6 +203,7 @@ class HamiltonionBackend:
 
         self.plot_graph(xVal, yVal, phases)
         
+
 class FeynmanBackend:
     provider = "Local"
     settings = None
@@ -255,8 +249,12 @@ class FeynmanBackend:
         xVal = list(self.results.keys())
         yVal = [(count / total) * 100 for count in self.results.values()]
 
+        self.keepVals = (xVal, yVal)
+
+    def display(self):
+        xVal, yVal = self.keepVals
         self.plot_graph(xVal, yVal)
-        
+
 class HamiltonionCuQuantumBackend:
     provider = "Local"
     settings = None
@@ -343,10 +341,11 @@ class DWaveBackend:
     def __init__(self, newSettings):
         self.settings = newSettings
         self.API_Token = "NONE"  # It's better to set default values in __init__
-
+    
     def sendAPIToken(self, api_string):
         self.API_Token = api_string
     
+
     def plot_graph(self):
         if self.results is None:
             print("No data")
@@ -357,8 +356,11 @@ class DWaveBackend:
         self.histogramResult = plt.hist(energies, bins='auto')
         plt.xlabel("Minimum Energy of Solutions")
         plt.ylabel("Number of Occurrences")
+
         plt.clf()
 
+    def display(self):
+        self.plot_graph()
 
     def sendRequest(self):
         cqm = dimod.CQM()
@@ -409,6 +411,9 @@ class XanaduBackend:
         self.histogramResult = plt
 
         plt.clf()
+
+    def display(self):
+        self.plot_graph()
 
     def sendRequest(self, gridWidth, gridHeight, grid):
         circuit = sf.Program(gridHeight)
@@ -542,9 +547,9 @@ class QiskitBackend:
 
 def BackendFactory(backendType="HamiltonionSimulation", settings=SettingsFile.Settings()):
     backendTypes = {
-        "HamiltonionSimulation": HamiltonionBackend,
+        "HamiltionSimulation": HamiltonionBackend,
         "FeynmanSimulation": FeynmanBackend,
-        "HamiltonionSimulationCuQuantum": HamiltonionCuQuantumBackend,
+        "HamiltionSimulationCuQuantum": HamiltonionCuQuantumBackend,
         "DWaveSimulation": DWaveBackend,
         "Photonic": XanaduBackend,
         "Qiskit": QiskitBackend
