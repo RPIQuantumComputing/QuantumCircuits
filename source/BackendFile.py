@@ -1,44 +1,33 @@
-from unittest import result
 import SettingsFile
 import math
 import matplotlib.pyplot as plt
 
 # Check to ensure cupy support or default to numpy
-hasCupy = True
-try:
-    import cupy as np
-except:
-    import numpy as np
-    hasCupy = False
+import numpy as np
+hasCupy = False
 # Various Imports
-import numpy as tnp
-import random
 import matplotlib.cm as cm
 import matplotlib as mpl
 import itertools
-import functools
-from numpy.random import choice, rand
-from numpy import linalg as LA
-import scipy
 import pandas as pd
-from scipy.optimize import minimize
+import xcc
+import strawberryfields as sf
+import xcc.commands
+import dimod
+import cuquantum
+from cuquantum import CircuitToEinsum
+from qiskit_ibm_runtime import QiskitRuntimeService, Sampler
+from dwave.system import LeapHybridCQMSampler
+from strawberryfields import RemoteEngine, ops
+import ParseCircuit as PC
+from tkinter import simpledialog, Tk
 from qiskit import QuantumCircuit
 from qiskit import Aer, transpile
-import qiskit
-from qiskit.tools.visualization import plot_histogram, plot_state_city
-from qiskit_aer.library.save_instructions import save_statevector
-import qiskit.quantum_info as qi
-import ParseCircuit
-import sys
-import tkinter as tk
-from tkinter import simpledialog
-from qiskit.circuit.random import random_circuit 
-from qiskit.quantum_info import SparsePauliOp 
-from qiskit_ibm_runtime import QiskitRuntimeService, Estimator 
-from qiskit_ibm_runtime import Sampler
+from qiskit.compiler import transpile
+from qiskit_aer.library.save_instructions.save_statevector import save_statevector
 
 def get_api_key():
-    root = tk.Tk()
+    root = Tk()
     root.withdraw()  # Hide the main window
     api_key = simpledialog.askstring("API Key Request", "Please enter your API key:")
     return api_key
@@ -57,8 +46,8 @@ def getGrid(grid, gridWidth, gridHeight):
 
 def getInstructions(object_grid, gridWidth, gridHeight):
     grid = getGrid(object_grid, gridWidth, gridHeight)
-    node = ParseCircuit.parse(grid)
-    return ParseCircuit.get_instructions(node)
+    node = PC.parse(grid=grid)
+    return PC.get_instructions(node)
 
 def makeCircuit(qc, gate_sequence):
     # Iterate through the gate sequence and add gates to the circuit
@@ -91,65 +80,12 @@ def makeCircuit(qc, gate_sequence):
             qc.cx(qubits[1], qubits[0])  # Control qubit, Target qubit
     return qc
     
-class HamiltonionBackend:
-    provider = "Local"
-    settings = None
-    histogramResult = None
+
+class Backend:
     results = None
-
-    def __init__(self, newSettings):
-        self.settings = newSettings
     
-    def sendAPIToken():
-        pass
-    
-    def sendRequest(self, gridWidth, gridHeight, grid):
-        # Get results, store figure, normalize, apply phase scalar map
-# Do similar decomposition process
-        instructions = getInstructions(grid, gridWidth, gridHeight)
-        numQubits = gridHeight
-        numDepth = gridWidth
-
-        # Make qiskit circuit
-        circuit = QuantumCircuit(numQubits)
-        circuit = makeCircuit(circuit, instructions)     
-        circuit.save_statevector()
-
-        # Compute the probability of certain qubits being 1, i.e. specific bitstring result
-        def returnProbabilitiy(statevector, qubitsActive):
-            projectTo = np.array([1])
-            for entry in range(0, len(qubitsActive)):
-                if(qubitsActive[entry] == 1):
-                    projectTo = np.kron(projectTo, np.array([0, 1]))
-                else:
-                    projectTo = np.kron(projectTo, np.array([1, 0]))
-            projectTo = projectTo
-            projectTo = np.transpose(projectTo)
-            dotProduct = projectTo.dot(statevector)
-            return dotProduct
-        
-        def getAllPossibilities(statevector, qubits):
-            bin_str = [''.join(p) for p in itertools.product('01', repeat=qubits)]
-            possibility = [list(p) for p in itertools.product([0, 1], repeat=qubits)]
-            result = []
-            for entry in range(len(possibility)):
-                dotProduct = returnProbabilitiy(statevector, possibility[entry])
-                probability = np.real(dotProduct * np.conj(dotProduct))
-                phase = np.angle(dotProduct)
-                if(probability > 0):
-                    result.append([bin_str[entry], probability, phase])
-            return result
-        
-        # Save results
-        simulator = Aer.get_backend('aer_simulator')
-        circ = transpile(circuit, simulator)
-
-        # Run and get statevector
-        result = simulator.run(circ).result()
-        sv = result.get_statevector(circ)
-        sv = np.array(sv)
-        results = getAllPossibilities(sv, numQubits)
-        self.result = result
+    def display(self):
+        results = self.results
         fig = plt.figure(figsize = (20, 5))
         xVal = []
         yVal = []
@@ -164,9 +100,9 @@ class HamiltonionBackend:
             else:
                 yVal.append(entry[1]*100)
         if(hasCupy):
-            phases = [m.to_rgba(tnp.angle(results[j][2].get() * 1j)) for j in range(len(results))]
+            phases = [m.to_rgba(np.angle(results[j][2].get() * 1j)) for j in range(len(results))]
         else:
-            phases = [m.to_rgba(tnp.angle(results[j][2] * 1j)) for j in range(len(results))]
+            phases = [m.to_rgba(np.angle(results[j][2] * 1j)) for j in range(len(results))]
             
         # Values are not sorted, do your magic pandas!
         df = pd.DataFrame(
@@ -189,7 +125,84 @@ class HamiltonionBackend:
         cbar.set_label('Relative Phase of State (Radians)', rotation=-90, labelpad=20)
         plt.title("Probability Distribution of Given Quantum Circuit")
         self.histogramResult = plt
+
+class HamiltonionBackend(Backend):
+    provider = "Local"
+    settings = None
+    histogramResult = None
+    results = None
+
+    def __init__(self, newSettings):
+        self.settings = newSettings
+    
+    def sendAPIToken(self):
+        pass  # Instance method now, fixed missing self parameter
+    
+    def returnProbability(self, statevector, qubitsActive):
+        projectTo = np.array([1])
+        for entry in range(0, len(qubitsActive)):
+            if(qubitsActive[entry] == 1):
+                projectTo = np.kron(projectTo, np.array([0, 1]))
+            else:
+                projectTo = np.kron(projectTo, np.array([1, 0]))
+        projectTo = projectTo
+        projectTo = np.transpose(projectTo)
+        dotProduct = projectTo.dot(statevector)
+        return dotProduct
+
+    def getAllPossibilities(self, statevector, qubits):
+        bin_str = [''.join(p) for p in itertools.product('01', repeat=qubits)]
+        possibility = [list(p) for p in itertools.product([0, 1], repeat=qubits)]
+        result = []
+        for entry in range(len(possibility)):
+            dotProduct = self.returnProbability(statevector, possibility[entry])
+            probability = np.real(dotProduct * np.conj(dotProduct))
+            phase = np.angle(dotProduct)
+            if(probability > 0):
+               result.append([bin_str[entry], probability, phase])
+        return result
+
+    def plot_graph(self, xVal, yVal, phases):
+        df = pd.DataFrame({'x': xVal, 'y': yVal, 'phase': phases})
+        df_sorted = df.sort_values('x')
+
+        norm = mpl.colors.Normalize(vmin=0, vmax=np.pi)
+        cmap = cm.hsv
+        m = cm.ScalarMappable(norm=norm, cmap=cmap)
+        colors = m.to_rgba(np.angle(phases))
+        rotationAmount = math.floor(90 / (1 + np.exp(-((len(xVal) / 3) - 5))))
+
+        plt.bar(df_sorted['x'], df_sorted['y'], width=0.4, color=colors)
+        plt.xlabel("Computational Result")
+        plt.ylabel("Probability (%)")
+        rotationAmount = math.floor(90 / (1 + np.exp(-((len(xVal) / 3) - 5))))
+        plt.xticks(rotation=rotationAmount)
+        cbar = plt.colorbar(m)
+        cbar.set_label('Relative Phase of State (Radians)', rotation=270, labelpad=20)
+        plt.title("Probability Distribution of Given Quantum Circuit")
+        self.histogramResult = plt
+        plt.clf()
+
+    def sendRequest(self, gridWidth, gridHeight, grid):
+        instructions = getInstructions(grid, gridWidth, gridHeight)
+        numQubits = gridHeight
+        circuit = makeCircuit(QuantumCircuit(numQubits), instructions)
+        circuit.save_statevector()
+        
+        simulator = Aer.get_backend('aer_simulator')
+        circ = transpile(circuit, simulator)
+        result = simulator.run(circ).result()
+        statevector = np.array(result.get_statevector(circ))
+        
+        results = self.getAllPossibilities(statevector, numQubits)
         self.results = results
+        self.result = result
+        
+        xVal, yVal = zip(*[(entry[0][::-1], entry[1]*100) for entry in results])
+        phases = [entry[2] for entry in results]
+
+        self.plot_graph(xVal, yVal, phases)
+        
 
 class FeynmanBackend:
     provider = "Local"
@@ -200,50 +213,48 @@ class FeynmanBackend:
     def __init__(self, newSettings):
         self.settings = newSettings
     
-    def sendAPIToken(api_string):
-        pass
-    
-    def sendRequest(self, gridWidth, gridHeight, grid):
-        # Do similar decomposition process
-        instructions = getInstructions(grid, gridWidth, gridHeight)
-        numQubits = gridHeight
-        numDepth = gridWidth
+    def sendAPIToken(self, api_string):  # Fixed missing self parameter
+        pass  # Placeholder for actual implementation
 
-        # Make qiskit circuit
-        circuit = QuantumCircuit(numQubits)
-        circuit = makeCircuit(circuit, instructions)     
-        circuit.measure_all()        
-        # Save results
-        simulator = Aer.get_backend('aer_simulator_density_matrix')
-        self.results = simulator.run(circuit).result().get_counts(circuit)
-        fig = plt.figure(figsize = (20, 5))
-        xVal = []
-        yVal = []
-        total = 0
-        # Turn into histogram format
-        for _, y in self.results.items():
-            total += y
-        for a, b in self.results.items():
-            xVal.append(a)
-            yVal.append((b / total) * 100)
-
-        df = pd.DataFrame(
-            dict(
-                x=xVal,
-                y=yVal
-            )
-        )
-        # Same plotting as before
+    def plot_graph(self, xVal, yVal):
+        df = pd.DataFrame({'x': xVal, 'y': yVal})
         df_sorted = df.sort_values('x')
-        plt.bar(df_sorted['x'], df_sorted['y'], width = 0.4)
+
+        number_of_results = len(xVal)
+        rotationAmount = math.floor(90 / (1 + np.exp(-((number_of_results / 3) - 5))))
+
+        plt.bar(df_sorted['x'], df_sorted['y'], width=0.4)
         plt.xlabel("Computational Result")
-        plt.ylabel("Probability")
-        rotationAmount = math.floor(90/(1 + np.exp(-(((len(xVal))/3)-5))))
-        plt.xticks(rotation = rotationAmount)
+        plt.ylabel("Probability (%)")
+        plt.xticks(rotation=rotationAmount)
         plt.title("Probability Distribution of Given Quantum Circuit")
         self.histogramResult = plt
-        print(self.results)
-        
+
+        plt.clf() 
+    
+    def sendRequest(self, gridWidth, gridHeight, grid):
+        instructions = getInstructions(grid, gridWidth, gridHeight)  # Assuming getInstructions is defined
+        numQubits = gridHeight
+
+        circuit = QuantumCircuit(numQubits)
+        circuit = makeCircuit(circuit, instructions)  # Assuming makeCircuit is defined
+        circuit.measure_all()
+
+        simulator = Aer.get_backend('aer_simulator_density_matrix')
+        result = simulator.run(circuit).result()
+        self.results = result.get_counts(circuit)
+
+        # List comprehensions are more pythonic and concise
+        total = sum(self.results.values())
+        xVal = list(self.results.keys())
+        yVal = [(count / total) * 100 for count in self.results.values()]
+
+        self.keepVals = (xVal, yVal)
+
+    def display(self):
+        xVal, yVal = self.keepVals
+        self.plot_graph(xVal, yVal)
+
 class HamiltonionCuQuantumBackend:
     provider = "Local"
     settings = None
@@ -253,174 +264,130 @@ class HamiltonionCuQuantumBackend:
     def __init__(self, newSettings):
         self.settings = newSettings
     
-    def sendAPIToken():
+    def sendAPIToken(self):
         pass
     
-    def sendRequest(self, gridWidth, gridHeight, grid):
-        from cuquantum import contract
-        from cuquantum import CircuitToEinsum
-        import cuquantum
-        # Get results, store figure, normalize, apply phase scalar map
-# Do similar decomposition process
-        instructions = getInstructions(grid, gridWidth, gridHeight)
-        numQubits = gridHeight
-        numDepth = gridWidth
+    def plot_graph(self, xVal, yVal, phases):
+        df = pd.DataFrame({'x': xVal, 'y': yVal, 'phase': phases})
+        df_sorted = df.sort_values('x')
 
-        # Make qiskit circuit
-        circuit = QuantumCircuit(numQubits)
-        circuit = makeCircuit(circuit, instructions)    
+        norm = mpl.colors.Normalize(vmin=0, vmax=np.pi)
+        cmap = cm.hsv
+        m = cm.ScalarMappable(norm=norm, cmap=cmap)
+        colors = m.to_rgba(np.angle(phases))
+        rotationAmount = math.floor(90 / (1 + np.exp(-((len(xVal) / 3) - 5))))
+
+        plt.bar(df_sorted['x'], df_sorted['y'], width=0.4, color=colors)
+        plt.xlabel("Computational Result")
+        plt.ylabel("Probability (%)")
+
+        plt.xticks(rotation=rotationAmount)
+        cbar = plt.colorbar(m)
+        cbar.set_label('Relative Phase of State (Radians)', rotation=270, labelpad=20)
+        plt.title("Probability Distribution of Given Quantum Circuit")
+        self.histogramResult = plt
+
+        plt.clf()
+
+    def sendRequest(self, gridWidth, gridHeight, grid):
+        instructions = getInstructions(grid, gridWidth, gridHeight)  # Assuming getInstructions is defined
+        numQubits = gridHeight
+        circuit = makeCircuit(QuantumCircuit(numQubits), instructions)  # Assuming makeCircuit is defined
                         
         myconverter = CircuitToEinsum(circuit, dtype='complex128', backend=np)
-        # Compute the probability of certain qubits being 1, i.e. specific bitstring result
-        def returnProbabilitiy(statevector, qubitsActive):
-            projectTo = np.array([1])
-            for entry in range(0, len(qubitsActive)):
-                if(qubitsActive[entry] == 1):
-                    projectTo = np.kron(projectTo, np.array([0, 1]))
-                else:
-                    projectTo = np.kron(projectTo, np.array([1, 0]))
-            projectTo = projectTo
-            projectTo = np.transpose(projectTo)
-            dotProduct = projectTo.dot(statevector)
-            return dotProduct
-        
-        def getAllPossibilities(statevector, qubits):
-            bin_str = [''.join(p) for p in itertools.product('01', repeat=qubits)]
-            possibility = [list(p) for p in itertools.product([0, 1], repeat=qubits)]
-            result = []
-            for entry in range(len(possibility)):
-                dotProduct = returnProbabilitiy(statevector, possibility[entry])
-                probability = np.real(dotProduct * np.conj(dotProduct))
-                phase = np.angle(dotProduct)
-                if(probability > 0):
-                    result.append([bin_str[entry], probability, phase])
-            return result
-        
-        if(self.settings.gateSplit == 1):
-            print("Enabling Gate Split...")
-            cuquantum.cutensornet.GateSplitAlgo = 1
-        else:
-            cuquantum.cutensornet.GateSplitAlgo = 0
+
+        # Setting cuQuantum configuration
+        cuquantum.cutensornet.GateSplitAlgo = int(self.settings.gateSplit == 1)
         cuquantum.cutensornet.ABS_CUTOFF = self.settings.cuQuantumConfig[0]
         cuquantum.cutensornet.REL_CUTOFF = self.settings.cuQuantumConfig[1]
-                
-        # Save results
-        if(len(self.settings.bitstringsSample) <= 1):
+
+        # Perform tensor network contraction
+        if len(self.settings.bitstringsSample) <= 1:
             print("Performing Tensor Network Contraction")
             expression, operands = myconverter.state_vector()
-            sv = contract(expression, *operands)
+            sv = cuquantum.contract(expression, *operands)
             sv = sv.reshape(-1)
             print("Statevector found by Tensor Network Contraction")
-            results = getAllPossibilities(sv, numQubits)
-            self.result = results
+            results = self.getAllPossibilities(sv, numQubits)
         else:
             print("Performing Selective Tensor Network Contraction")
             results = []
             for bitstring in self.settings.bitstringsSample:
                 expression, operands = myconverter.amplitude(bitstring)
-                amplitude = contract(expression, *operands)
+                amplitude = cuquantum.contract(expression, *operands)
                 probability = abs(amplitude) ** 2
                 results.append([bitstring, probability, np.angle(amplitude)])
-            self.result = results
             print("Finished sampling desired subset of distribution...")
-        fig = plt.figure(figsize = (20, 5))
-        xVal = []
-        yVal = []
-        norm = mpl.colors.Normalize(vmin=0, vmax=np.pi)
-        cmap = cm.hsv
-        m = cm.ScalarMappable(norm=norm, cmap=cmap)
-        # Normalize to 100% (show percentages, not decimals)
-        for entry in results:
-            xVal.append(entry[0][::-1])
-            if(hasCupy):
-                yVal.append(entry[1].get()*100)
-            else:
-                yVal.append(entry[1]*100)
-        if(hasCupy):
-            phases = [m.to_rgba(tnp.angle(results[j][2].get() * 1j)) for j in range(len(results))]
-        else:
-            phases = [m.to_rgba(tnp.angle(results[j][2] * 1j)) for j in range(len(results))]
-        # Values are not sorted, do your magic pandas!
-        df = pd.DataFrame(
-            dict(
-                x=xVal,
-                y=yVal,
-                phase=phases
-            )
-        )
-
-        df_sorted = df.sort_values('x')
-        # Make graph
-        plt.bar(df_sorted['x'], df_sorted['y'], width = 0.4, color = df_sorted['phase'])
-        plt.xlabel("Computational Result")
-        plt.ylabel("Probability")
-        # Empirical formula to find rotations
-        rotationAmount = math.floor(90/(1 + np.exp(-(((len(xVal))/3)-5))))
-        plt.xticks(rotation = rotationAmount)
-        cbar = plt.colorbar(m)
-        cbar.set_label('Relative Phase of State (Radians)', rotation=-90, labelpad=20)
-        plt.title("Probability Distribution of Given Quantum Circuit")
-        self.histogramResult = plt
+        
+        # Plotting
+        xVal, yVal, phases = zip(*[(res[0][::-1], res[1] * 100, res[2]) for res in results])
         self.results = results
+        self.plot_graph(xVal, yVal, phases)
+        
+
+    def getAllPossibilities(self, statevector, qubits):
+        bitstrings = [''.join(seq) for seq in itertools.product('01', repeat=qubits)]
+        probabilities = np.abs(statevector) ** 2
+        phases = np.angle(statevector)
+        return [(bitstring, prob, phase) for bitstring, prob, phase in zip(bitstrings, probabilities, phases) if prob > 0]
 
 class DWaveBackend:
     provider = "DWave"
     settings = None
     histogramResult = None
     results = None
-    API_Token = "NONE"
+    API_Token = None
 
     def __init__(self, newSettings):
         self.settings = newSettings
+        self.API_Token = "NONE"  # It's better to set default values in __init__
     
     def sendAPIToken(self, api_string):
         self.API_Token = api_string
     
-    def sendRequest(self, gridWidth, gridHeight, grid):
-        import math
-        import dimod
-        from dimod import Binary, Integer
-        import dwave.inspector
-        # Initalize a constraint quadratic model
-        cqm = dimod.CQM()
-        stop = False
-        # Execute variable declarations
-        for entry in self.settings.variableDeclarationsQUBO:
-            if(len(entry) > 1):
-                exec(entry)
-        # Extract objective function
-        objectiveFunction = self.settings.objectiveQUBOS
-        print(self.settings.objectiveQUBOS)
-        # Set objective
-        if("max" in objectiveFunction):
-            eval("cqm.set_objective(" + "-1*(" + objectiveFunction[4:] + ")" + ")")
-        else:
-            eval("cqm.set_objective(" + objectiveFunction[4:] + ")")
-        # Add constraints
-        stop = False
-        for entry in self.settings.constraintsQUBO:
-            if(len(entry) > 1):
-                eval("cqm.add_constraint(" + entry + ")")
-        # Use token to sample solutions and filter out infeasible ones
-        if(self.API_Token == "NONE"):
-            self.API_Token = get_api_key()
-        from dwave.system import LeapHybridCQMSampler
-        sampler = LeapHybridCQMSampler(token=self.API_Token)     
-        sampleset = sampler.sample_cqm(cqm, label='QuboParsing')
-        sampleset = sampleset.filter(lambda row: row.is_feasible)
-        self.results = sampleset
-        # Get resulting energies and save result
-        valuesFound = []
-        for energy, in sampleset.data(fields=['energy']):
-            valuesFound.append(energy)
-        fig = plt.figure(figsize = (20, 5))
-        plt.hist(valuesFound)
+
+    def plot_graph(self):
+        if self.results is None:
+            print("No data")
+            return
+        
+        sampleset = self.results
+        energies = sampleset.record.energy
+        self.histogramResult = plt.hist(energies, bins='auto')
         plt.xlabel("Minimum Energy of Solutions")
-        plt.ylabel("Amount of Occurences")
-        self.histogramResult = plt
+        plt.ylabel("Number of Occurrences")
+
+        plt.clf()
+
+    def display(self):
+        self.plot_graph()
+
+    def sendRequest(self):
+        cqm = dimod.CQM()
+
+        # Variable declarations should be handled safely without exec
+        for var_declaration in self.settings.variableDeclarationsQUBO:
+            exec(var_declaration) in {}, locals()
+
+        # The objective function should be handled without eval
+        if self.settings.objectiveQUBOS.startswith("max"):
+            objective = eval(self.settings.objectiveQUBOS[4:]) * -1
+        else:
+            objective = eval(self.settings.objectiveQUBOS[4:])
+        cqm.set_objective(objective)
+
+        for constraint in self.settings.constraintsQUBO:
+            cqm.add_constraint(eval(constraint))
+        
+        sampler = LeapHybridCQMSampler(token=self.API_Token or get_api_key())  # Use the API token or get a new one
+        
+        sampleset = sampler.sample_cqm(cqm, label='QuboParsing').filter(lambda row: row.is_feasible)
+        self.results = sampleset
+        
+        self.plot_graph()
 
 class XanaduBackend:
-    provider = "Xandadu"
+    provider = "Xanadu"
     settings = None
     histogramResult = None
     results = None
@@ -432,80 +399,66 @@ class XanaduBackend:
     def sendAPIToken(self, api_string):
         self.API_KEY = api_string
     
-    def sendRequest(self, gridWidth, gridHeight, grid):
-        # Similar decomposition, expanded to support photonic multi-gate
-        circuitOperators = [[['-', [j]] for j in range(gridHeight)] for i in range(gridWidth)]
-        for widthIdx in range(gridWidth):
-            for heightIdx in range(gridHeight):
-                if(grid[widthIdx][heightIdx].getName() != '-'):
-                    if("PP" not in grid[widthIdx][heightIdx].getName() or len(grid[widthIdx][heightIdx].getName()) >= 3):
-                        circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
-                        circuitOperators[widthIdx][heightIdx+1] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
-                    else:
-                        circuitOperators[widthIdx][heightIdx] = [grid[widthIdx][heightIdx].getName(), grid[widthIdx][heightIdx].gate_qubitsInvolved]
-        numQubits = gridHeight
-        import strawberryfields as sf
-        from strawberryfields import ops
+    def plot_graph(self):
+        result = self.results
 
-        # Assume fock measurement
-        measurementType = ["F" for i in range(numQubits)]
-        # Initalize program
-        circuit = sf.Program(numQubits)
+        print("Saved values...")
+        # Save relevant infromation
+        plt.bar(result.keys(), result.values(), 1, color='b')
+        plt.xlabel("Fock Measurement State (binary representation for 'qubit' analysis)")
+        plt.ylabel("Occurences")
+        print("Saving Values...")
+        self.histogramResult = plt
+
+        plt.clf()
+
+    def display(self):
+        self.plot_graph()
+
+    def sendRequest(self, gridWidth, gridHeight, grid):
+        circuit = sf.Program(gridHeight)
+
+        # Gate mappings
+        gate_operations = {
+            "PD": lambda p: ops.Dgate(*p),
+            "PX": lambda p: ops.Xgate(p[0]),
+            "PZ": lambda p: ops.Zgate(p[0]),
+            "PS": lambda p: ops.Sgate(p[0]),
+            "PR": lambda p: ops.Rgate(p[0]),
+            "PP": lambda p: ops.Pgate(p[0]),
+            "PV": lambda p: ops.Vgate(p[0]),
+            "PF": lambda p: ops.Fouriergate(),
+            "PPV": lambda p: ops.Vacuum(),
+            "PPC": lambda p: ops.Coherent(*p),
+            "PPF": lambda p: ops.Fock(p[0]),
+            "PBS": lambda p: ops.BSgate(*p),
+            "PMZ": lambda p: ops.MZgate(*p),
+            "PS2": lambda p: ops.S2gate(*p),
+            "PCX": lambda p: ops.CXgate(p[0]),
+            "PCZ": lambda p: ops.CZgate(p[0]),
+            "PCK": lambda p: ops.CKgate(p[0]),
+        }
+
         with circuit.context as q:
             for widthIdx in range(gridWidth):
                 for heightIdx in range(gridHeight):
-                    # Load up gates
-                    if(grid[widthIdx][heightIdx].getName() != '-'):
-                        if(grid[widthIdx][heightIdx].getName() == "PD"):
-                            ops.Dgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0], self.settings.specialGridSettings[(widthIdx, heightIdx)][1]) | q[widthIdx]
-                        if(grid[widthIdx][heightIdx].getName() == "PX"):
-                            ops.Xgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | q[widthIdx]
-                        if(grid[widthIdx][heightIdx].getName() == "PZ"):
-                            ops.Zgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | q[widthIdx]
-                        if(grid[widthIdx][heightIdx].getName() == "PS"):
-                            ops.Sgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | q[widthIdx]
-                        if(grid[widthIdx][heightIdx].getName() == "PR"):
-                            ops.Rgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | q[widthIdx]
-                        if(grid[widthIdx][heightIdx].getName() == "PP"):
-                            ops.Pgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | q[widthIdx]
-                        if(grid[widthIdx][heightIdx].getName() == "PV"):
-                            ops.Vgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | q[widthIdx]
-                        if(grid[widthIdx][heightIdx].getName() == "PF"):
-                            ops.Fouriergate() | q[widthIdx]
-                        if(grid[widthIdx][heightIdx].getName() == "PPV"):
-                            ops.Vacuum() | q[widthIdx]
-                        if(grid[widthIdx][heightIdx].getName() == "PPC"):
-                            ops.Coherent(self.settings.specialGridSettings[(widthIdx, heightIdx)][0], self.settings.specialGridSettings[(widthIdx, heightIdx)][1]) | q[widthIdx]
-                        if(grid[widthIdx][heightIdx].getName() == "PPF"):
-                            ops.Fock(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | q[widthIdx]
-                        if(grid[widthIdx][heightIdx].getName() == "PBS"):
-                            ops.BSgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0], self.settings.specialGridSettings[(widthIdx, heightIdx)][1]) | (q[widthIdx], q[widthIdx + 1])
-                            heightIdx += 1
-                        if(grid[widthIdx][heightIdx].getName() == "PMZ"):
-                            ops.MZgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0], self.settings.specialGridSettings[(widthIdx, heightIdx)][1]) | (q[widthIdx], q[widthIdx + 1])
-                            heightIdx += 1
-                        if(grid[widthIdx][heightIdx].getName() == "PS2"):
-                            ops.S2gate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0], self.settings.specialGridSettings[(widthIdx, heightIdx)][1]) | (q[widthIdx], q[widthIdx + 1])
-                            heightIdx += 1
-                        if(grid[widthIdx][heightIdx].getName() == "PCX"):
-                            ops.CXgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | (q[widthIdx], q[widthIdx + 1])
-                            heightIdx += 1
-                        if(grid[widthIdx][heightIdx].getName() == "PCZ"):
-                            ops.CZgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | (q[widthIdx], q[widthIdx + 1])
-                            heightIdx += 1
-                        if(grid[widthIdx][heightIdx].getName() == "PCK"):
-                            ops.CKgate(self.settings.specialGridSettings[(widthIdx, heightIdx)][0]) | (q[widthIdx], q[widthIdx + 1])
-                            heightIdx += 1
-            ops.MeasureFock() | q # Assume fock measurement technique
+                    gate_name = grid[widthIdx][heightIdx].getName()
+                    if gate_name != '-':
+                        gate_params = self.settings.specialGridSettings.get((widthIdx, heightIdx), [])
+                        operation = gate_operations.get(gate_name)
+                        if operation:
+                            operation(gate_params) | q[widthIdx]
+                            if gate_name in ["PBS", "PMZ", "PS2", "PCX", "PCZ", "PCK"]:
+                                # Skip the next qubit since it's part of a two-qubit gate
+                                heightIdx += 1
+
+        ops.MeasureFock() | q  # Measurement at the end of the circuit
 
         if(self.API_Token == "NONE"):
             self.API_Token = get_api_key()
         
         # Save API token, ping for request
-        import xcc
-        from strawberryfields import RemoteEngine
         xcc.Settings(REFRESH_TOKEN=self.API_KEY).save()
-        import xcc.commands
         xcc.commands.ping()
 
         # Get remote results with Guassian Technique backend
@@ -523,14 +476,7 @@ class XanaduBackend:
                 result[s[:len(s)-1]] = 1
             else:
                 result[s[:len(s)-1]] += 1
-        print("Saved values...")
-        # Save relevant infromation
-        fig = plt.figure(figsize = (20, 5))
-        plt.bar(result.keys(), result.values(), 1, color='b')
-        plt.xlabel("Fock Measurement State (binary representation for 'qubit' analysis)")
-        plt.ylabel("Occurences")
-        print("Saving Values...")
-        self.histogramResult = plt
+        
         self.results = result
 
 class QiskitBackend:
@@ -546,29 +492,8 @@ class QiskitBackend:
     
     def sendAPIToken(self, api_string):
         self.API_KEY = api_string
-    
-    def sendRequest(self, gridWidth, gridHeight, grid):
-        # Get results, store figure, normalize, apply phase scalar map
-# Do similar decomposition process
-        instructions = getInstructions(grid, gridWidth, gridHeight)
-        numQubits = gridHeight
-        numDepth = gridWidth
 
-        # Make qiskit circuit
-        circuit = QuantumCircuit(numQubits)
-        circuit = makeCircuit(circuit, instructions)     
-        circuit.measure_all()
-        if(self.API_KEY == "NONE"):
-            self.API_KEY = get_api_key()
-        
-        service = QiskitRuntimeService(channel="ibm_quantum", instance="ibm-q/open/main", token=self.API_KEY)
-        backend = service.least_busy(simulator=True)
-        sampler = Sampler(backend) 
-        job = sampler.run(circuit) 
-        result = job.result() 
-        # Produce results
-        self.results = result.quasi_dists[0]
-        fig = plt.figure(figsize = (20, 5))
+    def plot_graph(self, xVal, yVal):
         xVal = []
         yVal = []
         total = 0
@@ -594,14 +519,38 @@ class QiskitBackend:
         plt.title("Probability Distribution of Given Quantum Circuit")
         self.histogramResult = plt
         print(self.results)
+        
+    
+    def sendRequest(self, gridWidth, gridHeight, grid):
+        # Get results, store figure, normalize, apply phase scalar map
+# Do similar decomposition process
+        instructions = getInstructions(grid, gridWidth, gridHeight)
+        numQubits = gridHeight
 
-# Backend factor to create gates
-def BackendFactory(backendType="HamiltionSimulation", settings=SettingsFile.Settings()):
+        # Make qiskit circuit
+        circuit = QuantumCircuit(numQubits)
+        circuit = makeCircuit(circuit, instructions)     
+        circuit.measure_all()
+        if(self.API_KEY == "NONE"):
+            self.API_KEY = get_api_key()
+        
+        service = QiskitRuntimeService(channel="ibm_quantum", instance="ibm-q/open/main", token=self.API_KEY)
+        backend = service.least_busy(simulator=True)
+        sampler = Sampler(backend) 
+        job = sampler.run(circuit) 
+        result = job.result() 
+        # Produce results
+        self.results = result.quasi_dists[0]
+
+        self.plot_graph()
+
+
+def BackendFactory(backendType="HamiltonionSimulation", settings=SettingsFile.Settings()):
     backendTypes = {
-        "HamiltionSimulation" : HamiltonionBackend,
-        "FeynmanSimulation" : FeynmanBackend,
+        "HamiltionSimulation": HamiltonionBackend,
+        "FeynmanSimulation": FeynmanBackend,
         "HamiltionSimulationCuQuantum": HamiltonionCuQuantumBackend,
-        "DWaveSimulation" : DWaveBackend,
+        "DWaveSimulation": DWaveBackend,
         "Photonic": XanaduBackend,
         "Qiskit": QiskitBackend
     }

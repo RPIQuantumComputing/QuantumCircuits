@@ -1,12 +1,3 @@
-# grid[col][row]
-
-# LL(1) Grammar to parse grid implemented using recursive descent
-# S(n, m) := B(n, m)
-# B(n, m) := idS B(n, m-1) | idC B(n, m - 1) | * B(n, m-1)
-    #        W(n-1, m, 0)  | W(n-1, m, k)    | W(n-1, m, -1)
-# W(n, m, k) := idS          | *              | idC(k1)
-#               W(n, m-1, k) | W(n, m-1, k-1) | W(n, m-1, k1)
-
 idS = {"H", "S", "T", "X(1/2)", "Y(1/2)", "-", "M"}
 idC = {"CNOT": 1, "CCX": 2, "CX": 1}
 idI = {"CX": 1}
