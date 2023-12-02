@@ -36,6 +36,14 @@ Note, one can also use the provided Dockerfile explicitly.
   2) docker network create local
   3) docker run --gpus all -ti --net=local -p 8905:8905 -p 8906:8906 quantumcircuits (remove --gpus all, if you do not have a Nvidia GPU)
 
+# MUST DO TO FIX PYDANTIC INCOMPATABILITY WITH CURRENT XANADU VERSION
+IN ENVIORNMENT:
+   1) apt-get install nano
+   2) cd xanadu-cloud-client
+   3) pip install pydantic-settings
+   4) nano /xcc/settings.py
+   5) CHANGE: "from pydantic import BaseSettings" to "from pydantic_settings import BaseSettings"
+
 Once in the enviornment, one can run "jupyter notebook --port=8905 --no-browser --ip=0.0.0.0 --allow-root" to launch a jupyter notebook or run "cd ../QuantumCircuits/source" with "python DesignerGUI.py" to launch the application
 
 # Install Instructions (for x86/x64 systems) [No Requirements]
