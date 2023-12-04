@@ -59,10 +59,12 @@ def vqe(hamiltonian, parametric_state, estimator, init_params, optimizer):
     opt_state = optimizer.get_init_state(init_params)
 
     def c_fn(param_values): 
-        return cost_fn(hamiltonian, 
-                       parametric_state, 
-                       param_values, 
-                       estimator)
+        return cost_fn(
+            hamiltonian, 
+            parametric_state, 
+            param_values, 
+            estimator
+        )
 
     def g_fn(param_values):
         grad = parameter_shift_gradient_estimates(
@@ -76,7 +78,7 @@ def vqe(hamiltonian, parametric_state, estimator, init_params, optimizer):
     print("\n" + '-' * 80)
     while True:
         opt_state = optimizer.step(opt_state, c_fn, g_fn)
-        print(f"ITERATION {opt_state.niter:<5} COST: {opt_state.cost}")
+        print(f"ITERATION {opt_state.niter:<5} COST: {opt_state.cost} eV")
 
         global costs
         costs.append(opt_state.cost)
@@ -99,6 +101,7 @@ class RunAlgorithm:
 
     def get_result(self, ham, electrons, orbitals) -> Any:
         import openfermion
+
         n_qubits = max(electrons, orbitals)*2
         hamiltonian = ham
 
@@ -127,7 +130,7 @@ class RunAlgorithm:
 # The simulation method heavily uses https://quri-parts.qunasys.com/tutorials/quantum_chemistry/mo_eint_and_hamiltonial's
 # Example code
 
-class Ui_QuantumSimulationGUI(object):
+class Ui_QuantumSimulationGUI(object): #20 commits of 75 lines or more 20 * 75
     user_mol = None
     user_mo_coeff=None
     active_space = None
@@ -143,38 +146,12 @@ class Ui_QuantumSimulationGUI(object):
 
         #text field to enter molecule
         self.textField = QtWidgets.QTextEdit()
-        left_layout.addWidget(self.textField)
 
-        #button to compute the electronic integrals
-        self.pushButton = QtWidgets.QPushButton("Compute Electronic Integrals")
-        self.pushButton.clicked.connect(self.on_compute_integrals_clicked)
-        left_layout.addWidget(self.pushButton)
-
-        #label for the electron and orbitals inpute fields
-        self.label_3 = QtWidgets.QLabel("Step 2: Specify the number of orbitals and electrons")
-        left_layout.addWidget(self.label_3)
-
-        #orbital input field
+        #orbital box
         self.orbitalBox = QtWidgets.QSpinBox()
-        left_layout.addWidget(self.orbitalBox)
-
-        #electron input field
-        self.electronBox = QtWidgets.QSpinBox()
-        left_layout.addWidget(self.electronBox)
-
-        #right side of the GUI layout
-        right_layout = QtWidgets.QVBoxLayout()
-        right_layout.setSpacing(0)
-
-        #ComboBox for mapping selection
-        mappings = ["SELECT MAPPING", "Jordan-Wigner", "Bravyi-Kitaev", "Symmetric Bravyi-Kitaev"]
-        self.mappingComboBox = QtWidgets.QComboBox()
         
-        self.mappingComboBox.addItems(mappings) #intialize values of the mapping box
-        self.mappingComboBox.setCurrentIndex(0)  #intialize the default to the first mapping
-        self.mappingComboBox.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
-
-        right_layout.addWidget(self.mappingComboBox)
+        #electron box field
+        self.electronBox = QtWidgets.QSpinBox()
 
         #ComboxBox for preset molecules
         presets = ["OPTIONAL PRESET", "Water", "Calcium Oxide", "Ozone", "Sodium Chloride", "Carbon Dioxide"]
@@ -186,11 +163,45 @@ class Ui_QuantumSimulationGUI(object):
         self.presetComboBox.setCurrentIndex(0)  #intialize the default to the first preset
         self.presetComboBox.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
 
-        right_layout.addWidget(self.presetComboBox)
+        left_layout.addWidget(self.presetComboBox)
+
+        #add the text field
+        left_layout.addWidget(self.textField)
+
+        #label for the electron and orbitals inpute fields
+        self.label_3 = QtWidgets.QLabel("Specify the number of orbitals and electrons")
+        left_layout.addWidget(self.label_3)
+
+        #orbital input field
+        # self.orbitalBox = QtWidgets.QSpinBox()
+        left_layout.addWidget(self.orbitalBox)
+
+        #electron input field
+        # self.electronBox = QtWidgets.QSpinBox()
+        left_layout.addWidget(self.electronBox)
+
+        #button to compute the electronic integrals
+        self.pushButton = QtWidgets.QPushButton("Compute Electronic Integrals")
+        self.pushButton.clicked.connect(self.on_compute_integrals_clicked)
+        left_layout.addWidget(self.pushButton)
+
+        #right side of the GUI layout
+        right_layout = QtWidgets.QVBoxLayout()
+        right_layout.setSpacing(0)
+
+        # #ComboBox for mapping selection
+        # mappings = ["SELECT MAPPING", "Jordan-Wigner", "Bravyi-Kitaev", "Symmetric Bravyi-Kitaev"]
+        # self.mappingComboBox = QtWidgets.QComboBox()
+        
+        # self.mappingComboBox.addItems(mappings) #intialize values of the mapping box
+        # self.mappingComboBox.setCurrentIndex(0)  #intialize the default to the first mapping
+        # self.mappingComboBox.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+
+        # right_layout.addWidget(self.mappingComboBox)
 
         #initialize the simulate button
         self.Simulate = QtWidgets.QPushButton("Simulate")
-        right_layout.addWidget(self.Simulate)
+        left_layout.addWidget(self.Simulate)
         self.Simulate.clicked.connect(self.on_simulate_clicked)
 
         #combine left and right layouts into the main_layout
