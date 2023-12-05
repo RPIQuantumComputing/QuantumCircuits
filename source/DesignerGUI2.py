@@ -80,7 +80,10 @@ class ControlledGateCell(QLabel):
     def loadGateImage(self, gate_name):
         if gate_name in ["H", "T", "S", "X", "Y", "Z"]:  # List all single qubit gates
             pixmap = QPixmap(f"../assets/{gate_name}.png")  # Assuming images are in an 'images' folder
-            self.setPixmap(pixmap)
+            square_width = self.width()
+            square_height = self.height()
+            scaled_pixmap = pixmap.scaled(square_width, square_height, Qt.KeepAspectRatio)
+            self.setPixmap(scaled_pixmap)
 
     # Mouse press event for drag initiation
     def mousePressEvent(self, event):

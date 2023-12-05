@@ -1,12 +1,16 @@
 # Settings class
 class Settings:
     # Basically a structure of relevant simulation information
-    backend = "HamiltionSimulation"
+    backend = "HamiltonianSimulation"
     num_qubits = 5
     num_width = 8
-    shots = -1
+    isNoiseEnabled = False
+    fake_provider = "Toronto"
+    shots = 1024
     measurement = False
-    noise_model = None
+    gate_error = False
+    readout_error = False
+    temperature = 0
     optimization = None
     gate_suggestion = False
     incremental_saving = False
