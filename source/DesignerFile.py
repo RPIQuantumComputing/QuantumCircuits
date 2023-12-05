@@ -10,7 +10,6 @@ import SettingsFile
 import math
 import matplotlib.pyplot as plt
 import numpy as np
-import random
 import pandas as pd
 import matplotlib.cm as cm
 import matplotlib as mpl
@@ -25,7 +24,7 @@ class Designer:
     tempGrid = []
     settings = SettingsFile.Settings()
     result = None
-    resultingHistgram = None
+    resultingHistogram = None
 
     # Cursed as it is, this uses the Singleton design pattern to ensure duplicate gate objects are not create,
     # instead one stores the positions and identifying string
@@ -131,20 +130,29 @@ class Designer:
             print(tempStr)
         print(entry)
 
+
+    """ 
+    TODO:
+        Fix this bug. The backend needs to constantly updated. 
+    """
+    def update(self, show):
+        simulation = SimulationFile.Simulation(self.settings)
+        simulation.sendStateInfo(self.gridWidth, self.gridHeight, self.grid)
+        self.result = simulation.get_results(show=show)
+        self.resultingHistogram = simulation.get_visualization()
+    
     # Specify simulation settings, send grid information, run simulation, and get results
     def runSimulation(self):
         print(self.settings.specialGridSettings)
-        simulation = SimulationFile.Simulation(self.settings)
-        simulation.sendStateInfo(self.gridWidth, self.gridHeight, self.grid)
-        self.result = simulation.get_results()
-        self.resultingHistgram = simulation.get_visualization()
+        self.update(show=True)
 
     # Return back found result histogram
     def getVisualization(self):
-        return self.resultingHistgram
+        return self.resultingHistogram
 
     # Return back found result
     def getStatistics(self):
+        self.update(show=False)
         return self.result
 
     # Allows one to set the backend being used
@@ -205,7 +213,7 @@ class Designer:
                 cbar.set_label('Relative Phase of State (Radians)',
                            rotation=-90, labelpad=20)
                 plt.title("Probability Distribution of Given Quantum Circuit")
-                self.resultingHistgram = plt
+                self.resultingHistogram = plt
             if(hasResults and self.settings.backend == "FeynmanSimulation"):
                 fig = plt.figure(figsize = (20, 5))
                 xVal = []
@@ -292,9 +300,9 @@ class Designer:
             couplingMapping.append([qubitIdx, qubitIdx + 1])
         # Save transpilation result
         simplified = transpile(circuit, backend=backend, coupling_map=couplingMapping, optimization_level=3)
-        simplified.draw(output='mpl', filename='simplified.png') 
+        simplified.draw(output='mpl', filename='../assets/simplified.png') 
         # Plot result
         import matplotlib.image as mpimg
-        img = mpimg.imread('simplified.png')
+        img = mpimg.imread('../assets/simplified.png')
         imgplot = plt.imshow(img)
         plt.show()

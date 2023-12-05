@@ -1,18 +1,3 @@
-#grid = [["H", "H", "S", "-", "-"], ["CNOT", "*", "-", "-", "-"], ["-", "CNOT", "*", "-", "-"],
-#        ["CNOT", "*", "CCX", "*", "*"], ["CCX", "*", "*", "S", "-"], ["S", "-", "-", "-", "-"]]
-grid = [["H", "H", "H", "H"], ["CX", "*", "X(1/2)", "T"], ["X(1/2)", "CX", "*", "Y(1/2)"], ["T", "X(1/2)", "CX", "*"], ["CX", "-", "-", "*"], ["H", "H", "H", "H"]]
-# ["CX", "*", "-", "-"], ["-", "CX", "*", "-"], 
-#        ["-", "-", "CX", "*"],
-#grid = [["CX", "-", "-", "*"]]
-# grid[col][row]
-
-# LL(1) Grammar to parse grid implemented using recursive descent
-# S(n, m) := B(n, m)
-# B(n, m) := idS B(n, m-1) | idC B(n, m - 1) | * B(n, m-1)
-    #        W(n-1, m, 0)  | W(n-1, m, k)    | W(n-1, m, -1)
-# W(n, m, k) := idS          | *              | idC(k1)
-#               W(n, m-1, k) | W(n, m-1, k-1) | W(n, m-1, k1)
-
 idS = {"H", "S", "T", "X(1/2)", "Y(1/2)", "-", "M"}
 idC = {"CNOT": 1, "CCX": 2, "CX": 1}
 idI = {"CX": 1}
@@ -160,5 +145,26 @@ def printTree(root, level=0):
 def parse(grid):
     print("----------------GENERATING PARSE TREE---------------------------")
     parseTree = generateParseTree(grid, 0, 0)
-    printTree(parseTree)
     return parseTree
+
+def get_instructions(root, level=0, instructions=None):
+    # Initialize instructions as an empty list if it's None
+    if instructions is None:
+        instructions = []
+
+    if root is None:
+        return instructions
+
+    # Gather instruction if the node data meets certain conditions
+    if isinstance(root.data, tuple) and root.data[0] != "-" and root.data[0] != "*":
+        instructions.append((root.data[0], root.get_associations()))
+
+    # Recurse on the left, middle, and right children, if they exist
+    if root.get_left() is not None:
+        get_instructions(root.get_left(), level + 1, instructions)
+    if root.get_middle() is not None:
+        get_instructions(root.get_middle(), level + 1, instructions)
+    if root.get_right() is not None:
+        get_instructions(root.get_right(), level + 1, instructions)
+
+    return instructions  # Return the instructions list
