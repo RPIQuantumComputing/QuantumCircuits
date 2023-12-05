@@ -1,0 +1,53 @@
+from qiskit import QuantumCircuit
+from qiskit.circuit import Parameter
+from qiskit.opflow import PauliSumOp, I, X, Z, Y
+from qiskit.algorithms import VarQITE
+from qiskit.algorithms.time_evolvers.variational import ImaginaryMcLachlanPrinciple
+from qiskit.algorithms.time_evolvers.variational.solvers.ode.forward_euler_solver import ForwardEulerSolver
+import qiskit
+import numpy as np
+from qiskit.algorithms.optimizers import SLSQP
+
+def variational_progress_callback(iteration, params, mean, stddev):
+    print(f"Iteration {iteration}: Params = {params}, Mean = {mean}, StdDev = {stddev}")
+
+# Define the Hamiltonian (example)
+hamiltonian = 0.5 * (I ^ X ^ Z ^ Z) - 0.8 * (Z ^ I ^ Y ^ Z)
+
+time = input("Imaginary Time: ")
+
+# Setup the Ansatz
+ansatz = qiskit.circuit.library.EfficientSU2(num_qubits=3)
+
+# Variational Principle
+variational_principle = ImaginaryMcLachlanPrinciple()
+
+# Define the optimizer with the callback
+#optimizer = SLSQP(callback=variational_progress_callback)
+
+# Create VarQITE instance
+varqite = VarQITE(ansatz=ansatz, initial_parameters=np.random.rand(len(ansatz.parameters)),
+                  variational_principle=variational_principle)
+
+# Evolution Problem
+from qiskit.algorithms.time_evolvers import TimeEvolutionProblem
+evolution_problem = TimeEvolutionProblem(hamiltonian=hamiltonian, time=float(time))
+
+# Perform VarQITE Evolution
+result = varqite.evolve(evolution_problem)
+
+# Output the result
+print("Evolved State Circuit:")
+print(result.evolved_state)
+import qiskit
+from qiskit import Aer, transpile
+# If observables are defined in the evolution problem, their expectation values will also be part of the result
+# Simulating the circuit to get the statevector
+simulator = Aer.get_backend('statevector_simulator')
+# The evolved_state is a circuit with bound parameters
+transpiled_circuit = transpile(result.evolved_state, simulator)
+statevector = simulator.run(transpiled_circuit).result().get_statevector()
+
+# Output the state vector
+print("\nState Vector:")
+print(statevector)
