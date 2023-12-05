@@ -1,0 +1,48 @@
+from qiskit import QuantumCircuit, Aer, transpile, assemble
+from qiskit.visualization import plot_histogram, array_to_latex
+from qiskit.quantum_info import Operator
+import numpy as np
+
+# Function to create a single-qubit Pauli-X gate
+def apply_x_gate(qc, qubit, coefficient):
+    qc.rx(2 * coefficient, qubit)
+
+# Function to create a single-qubit Pauli-Z gate
+def apply_z_gate(qc, qubit, coefficient):
+    qc.rz(2 * coefficient, qubit)
+
+# Hamiltonian definition
+hamiltonian = {(0, 'X'): 0.5, (1, 'Z'): -0.8, (2, 'X'): 0.5, (3, 'Y'): 1.5}
+
+# Number of Trotter steps
+num_steps = 10
+
+# Number of qubits
+num_qubits = 5
+
+# Create quantum circuit
+qc = QuantumCircuit(num_qubits)
+
+# Applying Trotterization
+for _ in range(num_steps):
+    for term, coefficient in hamiltonian.items():
+        qubit, pauli = term
+        if pauli == 'X':
+            apply_x_gate(qc, qubit, coefficient)
+        elif pauli == 'Z':
+            apply_z_gate(qc, qubit, coefficient)
+
+# Visualize the circuit
+print("Quantum Circuit:")
+print(qc)
+
+# Simulate the circuit
+simulator = Aer.get_backend('statevector_simulator')
+transpiled_circuit = transpile(qc, simulator)
+result = simulator.run(transpiled_circuit).result()
+statevector = result.get_statevector()
+
+# Display the final state vector
+print("\nFinal State Vector:")
+print(statevector)
+
