@@ -10,9 +10,7 @@ from sklearn.metrics import accuracy_score
 
 import pennylane as qml
 from pennylane.templates import AngleEmbedding, StronglyEntanglingLayers
-from pennylane.operation import Tensor
 
-from sklearn import datasets
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score

@@ -1,28 +1,18 @@
-from PyQt5 import QtCore, QtGui, QtWidgets
+import sys
+import numpy as np
+import matplotlib.pyplot as plt
+from PyQt5 import QtCore, QtWidgets
 from pyscf import gto, scf
+from typing import Any
 from quri_parts.pyscf.mol import get_spin_mo_integrals_from_mole
 from quri_parts.chem.mol import ActiveSpace
 from quri_parts.openfermion.mol import get_qubit_mapped_hamiltonian
-from quri_parts.openfermion.mol import get_fermionic_hamiltonian
-from quri_parts.qulacs.estimator import create_qulacs_vector_estimator
-import sys
-from typing import Any
-import numpy as np
 from quri_parts.qulacs.estimator import create_qulacs_vector_concurrent_parametric_estimator
-from openfermion.transforms import jordan_wigner
-from openfermion.utils import load_operator
 from quri_parts.algo.ansatz import HardwareEfficientReal
 from quri_parts.algo.optimizer import Adam, OptimizerStatus
 from quri_parts.circuit import LinearMappedUnboundParametricQuantumCircuit
-from quri_parts.core.estimator import create_parametric_estimator
 from quri_parts.core.estimator.gradient import parameter_shift_gradient_estimates
-from quri_parts.core.measurement import bitwise_commuting_pauli_measurement
-from quri_parts.core.sampling.shots_allocator import (
-    create_equipartition_shots_allocator,
-)
-from quri_parts.core.state import ParametricCircuitQuantumState, ComputationalBasisState
-from quri_parts.openfermion.operator import operator_from_openfermion_op
-import matplotlib.pyplot as plt
+from quri_parts.core.state import ParametricCircuitQuantumState
 
 costs = []
 # This is basically QuriPart's competition code with adjustments, will change to my competition code later

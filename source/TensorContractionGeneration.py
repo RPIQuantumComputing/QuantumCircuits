@@ -7,6 +7,8 @@ Original file is located at
     https://colab.research.google.com/drive/1n8SNsKp283B1e5Kh-6WjmQEMgjeGBcZ0
 """
 import networkx as nx
+import itertools
+
 grid = [["H", "H", "S", "-", "-"], ["CNOT", "*", "-", "-", "-"], ["-", "CNOT", "*", "-", "-"],
         ["CNOT", "*", "CCX", "*", "*"], ["CCX", "*", "*", "S", "-"], ["S", "-", "-", "-", "-"]]
 grid = [["H", "H", "H", "H"], ["CX", "*", "X(1/2)", "T"], ["X(1/2)", "CX", "*", "Y(1/2)"], ["T", "X(1/2)", "CX", "*"], ["CX", "-", "-", "*"], ["H", "H", "H", "H"]]
@@ -69,9 +71,9 @@ class Multigate:
         self.actorTypes = ["Control", "Actor"]
         self.actorMatrix = {"Control": [[1,0], [0,1]], "Actor": [[0,1],[1,0]]}
         self.qubitAssociation = []
-    def getMatrix(qubit, actor):
+    def getMatrix(self,qubit, actor):
         return self.actorMatrix[(self.qubitAssociation[qubit])]
-    def addQubit(qubit, actor):
+    def addQubit(self,qubit, actor):
         self.qubitAssociation[qubit] = actor
         
 def W(grid, n, m, k, associations):
@@ -193,67 +195,56 @@ def extractLayer(node, partialArray):
 def getComputation(root, layers):
     if(root.get_right() != None):
         layers.append(extractLayer(root, []))
-        layer = getComputation(root.get_right(), layers)
     return layers
 
 def getComputationLayers(tree):
   return getComputation(tree.get_middle(), [])
 
-def generateTensorNetworkGraph(computationLayers, qubit):
-  import networkx as nx
-  G = nx.Graph()
-  qubitAssociations = {-1: "None"}
-  for i in range(qubit):
-    G.add_node("S(" + str(i+1) + ")")
-    qubitAssociations[i] = "S(" + str(i+1) + ")"
-  index = 0
-  for layer in computationLayers:
-    index = index + 1
-    qubitsUsed = {-10}
-    for transformation in layer:
-      (operations, associations) = transformation
-      (operation, qubit) = operations.get_data()
-      if(len(associations) == 1):
-        node = "L(" + operation + "," + str(qubit) + "," + str(index) + ")"
-        G.add_node(node)
-        G.add_edge(qubitAssociations[qubit], node)
-        qubitAssociations[qubit] = node
-        qubitsUsed.add(qubit)
-      else:
-        if(operation in idI and len(associations) > 1):
-          for key1, value1 in associations.items():
-            for key2, value2 in associations.items():
-              if(key1 != key2):
-                G.add_edge(qubitAssociations[key1], qubitAssociations[key2])
-            qubitsUsed.add(key1)
-          qubitsUsed.add(qubit)
-        else:
-          if(len(associations) > 1):
-            oldOnes = []
-            for key1, value1 in associations.items():
-              oldOnes.append(qubitAssociations[key1])
-            for key, value in associations.items():
-              node = "L(" + operation + "," + str(key+1) + "," + str(index) + ")"
-              G.add_node(node)
-              qubitAssociations[key] = node
-              qubitsUsed.add(key)
-            qubitsUsed.add(qubit)
-            for key1, value1 in associations.items():
-              for key2, value2 in associations.items():
-                if(key1 != key2):
-                  G.add_edge(qubitAssociations[key1], qubitAssociations[key2])
-            for key1 in oldOnes:
-              for key2, values2 in associations.items():
-                if(key1 != key2):
-                  G.add_edge(qubitAssociations[key2], key1)
-            for key1 in oldOnes:
-              for key2 in oldOnes:
-                if(key1 != key2):
-                  G.add_edge(key2, key1)
-    for i in range(qubit):
-      if(i not in qubitsUsed):
-        G.add_edge(qubitAssociations[i], qubitAssociations[i])
-  return G
+
+def generate_tensor_network_graph(computation_layers, num_qubits):
+    G = nx.Graph()
+    qubit_associations = {"S({})".format(i + 1): i for i in range(num_qubits)}
+
+    for layer_index, layer in enumerate(computation_layers, start=1):
+        qubits_used = set()
+
+        for transformation in layer:
+            operations, associations = transformation
+            operation, qubit_index = operations.get_data()
+            node_label = "L({}, {}, {})".format(operation, qubit_index + 1, layer_index)
+
+            # Handling single qubit operations
+            if len(associations) == 1:
+                G.add_node(node_label)
+                qubit_name = "S({})".format(qubit_index + 1)
+                G.add_edge(qubit_associations[qubit_name], node_label)
+                qubit_associations[qubit_name] = node_label
+                qubits_used.add(qubit_index)
+
+            # Handling multi-qubit operations
+            else:
+                old_associations = {k: qubit_associations["S({})".format(k + 1)] for k in associations}
+
+                for qubit_key in associations:
+                    qubit_name = "S({})".format(qubit_key + 1)
+                    node_label = "L({}, {}, {})".format(operation, qubit_key + 1, layer_index)
+                    G.add_node(node_label)
+                    qubit_associations[qubit_name] = node_label
+                    qubits_used.add(qubit_key)
+
+                # Connecting all qubits involved in the operation
+                for q1, q2 in itertools.combinations(associations, 2):
+                    G.add_edge(qubit_associations["S({})".format(q1 + 1)], qubit_associations["S({})".format(q2 + 1)])
+                    G.add_edge(old_associations[q1], old_associations[q2])
+
+        # Linking qubits not involved in this layer
+        for i in range(num_qubits):
+            if i not in qubits_used:
+                qubit_name = "S({})".format(i + 1)
+                G.add_edge(qubit_associations[qubit_name], qubit_associations[qubit_name])
+
+    return G
+
 
 def drawTensorNetworkGraph(G):
   pos = nx.spring_layout(G)
