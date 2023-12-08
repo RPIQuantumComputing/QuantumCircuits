@@ -1,5 +1,6 @@
 from qiskit import QuantumCircuit, Aer, transpile, assemble
 import numpy as np
+import matplotlib.pyplot as plot
 
 # using qiskit library within this program
 
@@ -24,8 +25,8 @@ def qite_unitary(hamiltonian, num_steps = 1, num_qubits = None):
    # converts the transpiled circuit to qite unitary gate
    qite_unitary = transpiled_circuit.to_gate()
 
-   # returns gate
-   return qite_unitary
+   # returns gate and transpiled_circuit for visualization
+   return qite_unitary, transpiled_circuit
 
 # parameters --> numbers of qubits, hamiltonian term, and coefficient of said term
 def create_evolution_operator(num_qubits, term, coefficient):
@@ -57,8 +58,13 @@ hamiltonian = {(0, 'X'): 0.5, (1, 'Z'): -0.8}
 num_steps = 3
 
 # creates QITE unitary transformation by calling function
-qite_unitary_transform = qite_unitary(hamiltonian, num_steps)
+qite_unitary_transform, transpiled_circuit = qite_unitary(hamiltonian, num_steps)
 
 # prints final QITE unitary transformation
 print("QITE unitary transformation:")
 print(qite_unitary_transform)
+
+# visualization of QITE
+print("QITE visual:")
+transpiled_circuit.draw(output = 'mpl')
+plot.show()
