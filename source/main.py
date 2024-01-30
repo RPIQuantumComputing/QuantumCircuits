@@ -3,8 +3,12 @@ from PyQt5.QtWidgets import *
 
 # Imported Python files
 from Window import Window
-from DesignerGUI import GraphicsManager, GridManager, GateManager, SimulatorSettings, EmailManager
 
+import matplotlib
+matplotlib.use('Qt5Agg')
+import matplotlib.pyplot as plt
+
+from DesignerGUI import GraphicsManager, GridManager, GateManager, SimulatorSettings, EmailManager
 
 class Main():
     def __init__(self):

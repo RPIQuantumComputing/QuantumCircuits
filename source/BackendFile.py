@@ -1,5 +1,7 @@
 import SettingsFile
 import math
+import matplotlib
+matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 
 # Check to ensure cupy support or default to numpy
@@ -10,12 +12,14 @@ import matplotlib.cm as cm
 import matplotlib as mpl
 import itertools
 import pandas as pd
-import xcc
+#import xcc
 import strawberryfields as sf
-import xcc.commands
+#import xcc.commands
 import dimod
-import cuquantum
-from cuquantum import CircuitToEinsum
+import os
+if("nt" not in os.name):
+    import cuquantum
+    from cuquantum import CircuitToEinsum
 from qiskit_ibm_runtime import QiskitRuntimeService, Sampler
 from dwave.system import LeapHybridCQMSampler
 from strawberryfields import RemoteEngine, ops
@@ -458,8 +462,8 @@ class XanaduBackend:
             self.API_Token = get_api_key()
         
         # Save API token, ping for request
-        xcc.Settings(REFRESH_TOKEN=self.API_KEY).save()
-        xcc.commands.ping()
+        #xcc.Settings(REFRESH_TOKEN=self.API_KEY).save()
+        #xcc.commands.ping()
 
         # Get remote results with Guassian Technique backend
         eng = RemoteEngine("simulon_gaussian")
@@ -545,9 +549,9 @@ class QiskitBackend:
         self.plot_graph()
 
 
-def BackendFactory(backendType="HamiltonionSimulation", settings=SettingsFile.Settings()):
+def BackendFactory(backendType="HamiltonianSimulation", settings=SettingsFile.Settings()):
     backendTypes = {
-        "HamiltionSimulation": HamiltonionBackend,
+        "HamiltonianSimulation": HamiltonionBackend,
         "FeynmanSimulation": FeynmanBackend,
         "HamiltionSimulationCuQuantum": HamiltonionCuQuantumBackend,
         "DWaveSimulation": DWaveBackend,
