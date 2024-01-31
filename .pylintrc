@@ -27,4 +27,5 @@ ignore=
        testFileStrawberryField.py,
        testGateSimplification.py,
        testQUBOBackend.py,
+       SettingsFile.py,
        demos
