@@ -1,5 +1,6 @@
 [MASTER]
-ignore=BackendFile.py,
+ignore=
+       BackendFile.py,
        DataDiagram.py,
        DesignerFile.py,
        DesignerGUI.py,
