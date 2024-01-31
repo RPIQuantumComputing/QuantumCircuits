@@ -18,6 +18,7 @@ ignore=
        QuantumGlassSpinModelDemo.py,
        TensorContractionGeneration.py,
        QuantumVQDemo.py,
+       QuantumVQEDemo.py,
        SettingFile.py,
        SimulationFile.py,
        TensorContractionGenerate.py,
